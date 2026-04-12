@@ -51,6 +51,20 @@ Danach im Browser:
 
 - `http://localhost:3000`
 
+## GitHub Pages
+
+Für GitHub Pages wird die statische Web-App aus `docs/` veröffentlicht.
+
+- `docs/index.html` ist der Einstiegspunkt
+- `docs/.nojekyll` verhindert, dass GitHub Pages die App als Jekyll-Seite behandelt
+- in GitHub unter `Settings -> Pages` sollte `Deploy from a branch` mit dem Ordner `/docs` gewählt werden
+
+Wenn du lokal neu bauen willst, ist das vorgesehene Kommando:
+
+```powershell
+npm.cmd run deploy
+```
+
 ## Nächster sinnvoller Ausbau
 
 Der aktuelle Stand ist komplett lokal und clientseitig spielbar. Für den späteren Online-Modus über GitHub/Web-App bietet sich als nächster Schritt an:
