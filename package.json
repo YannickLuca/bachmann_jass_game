@@ -1,0 +1,15 @@
+{
+  "name": "bieterjass-local",
+  "version": "1.0.0",
+  "description": "Lokale Bieterjass-Testapp fuer 3 Spieler mit Schweizer Karten und Spiel-Logik",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "deploy": "node scripts/build-gh-pages.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

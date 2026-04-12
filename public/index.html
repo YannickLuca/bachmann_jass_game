@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bachmann Jass</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="screen-setup" class="screen">
+    <div class="setup-box">
+      <div class="setup-logo">Bachmann</div>
+      <h1 class="setup-title">Jass</h1>
+      <p id="setup-sub" class="setup-sub">3 Spieler - du spielst alleine gegen 2 Computer</p>
+
+      <div class="variant-picker" aria-label="Jassart wählen">
+        <button type="button" class="variant-card active" data-variant="bieter" aria-pressed="true">
+          <span class="variant-title">Bieterjass</span>
+          <span class="variant-copy">3 Spieler, Gebot, Solo gegen 2</span>
+        </button>
+        <button type="button" class="variant-card" data-variant="schieber" aria-pressed="false">
+          <span class="variant-title">Schieber Jass</span>
+          <span class="variant-copy">4 Spieler, Partner gegen Partner</span>
+        </button>
+      </div>
+
+      <div class="setup-form">
+        <label for="player-name">Dein Name</label>
+        <input id="player-name" type="text" value="Spieler 1" maxlength="18" />
+        <button id="btn-start" class="btn btn-primary">Spiel starten</button>
+      </div>
+
+      <div class="setup-rules">
+        <details open>
+          <summary>Aktuelle Grundregeln</summary>
+          <ul id="setup-rules-list"></ul>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-game" class="screen hidden">
+    <header class="top-bar">
+      <div class="title-wrap">
+        <span class="game-title">Bachmann Jass</span>
+        <span id="game-mode-label" class="game-mode-label">Bieterjass</span>
+      </div>
+      <div id="score-panel" class="score-panel"></div>
+    </header>
+
+    <main id="table-area" class="table-area mode-bieter">
+      <section id="zone-left" class="player-zone zone-left hidden">
+        <div class="player-label">
+          <span id="pname-left"></span>
+          <span id="badge-left" class="player-badge"></span>
+        </div>
+        <div id="hand-left" class="hand hand-ai hand-side"></div>
+      </section>
+
+      <section id="zone-top" class="player-zone zone-top hidden">
+        <div class="player-label">
+          <span id="pname-top"></span>
+          <span id="badge-top" class="player-badge"></span>
+        </div>
+        <div id="hand-top" class="hand hand-ai hand-top"></div>
+      </section>
+
+      <section class="center-zone">
+        <div class="status-row">
+          <div id="trump-display" class="trump-display hidden"></div>
+          <div id="message" class="message"></div>
+        </div>
+
+        <div id="trick-table" class="trick-table mode-bieter">
+          <div id="trick-slot-top" class="trick-slot slot-top"></div>
+          <div id="trick-slot-left" class="trick-slot slot-left"></div>
+          <div id="trick-slot-right" class="trick-slot slot-right"></div>
+          <div id="trick-slot-bottom" class="trick-slot slot-bottom"></div>
+        </div>
+
+        <div class="controls-area">
+          <div id="bid-controls" class="control-box hidden">
+            <span class="ctrl-label">Dein Gebot:</span>
+            <select id="bid-select"></select>
+            <button id="btn-bid" class="btn btn-accent">Bieten</button>
+          </div>
+
+          <div id="trump-controls" class="control-box hidden">
+            <span id="trump-prompt" class="ctrl-label">Trumpf wählen:</span>
+            <button class="trump-btn btn" type="button" data-suit="eicheln"></button>
+            <button class="trump-btn btn" type="button" data-suit="rosen"></button>
+            <button class="trump-btn btn" type="button" data-suit="schellen"></button>
+            <button class="trump-btn btn" type="button" data-suit="schilten"></button>
+            <button id="btn-push" class="btn btn-secondary hidden" type="button">Schieben</button>
+          </div>
+
+          <div id="round-end-controls" class="control-box hidden">
+            <div id="round-end-msg" class="summary-msg"></div>
+            <button id="btn-next-round" class="btn btn-primary" type="button">Nächste Runde</button>
+          </div>
+
+          <div id="game-over-controls" class="control-box hidden">
+            <div id="game-over-msg" class="summary-msg"></div>
+            <button id="btn-new-game" class="btn btn-primary" type="button">Zum Homescreen</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="zone-right" class="player-zone zone-right hidden">
+        <div class="player-label">
+          <span id="pname-right"></span>
+          <span id="badge-right" class="player-badge"></span>
+        </div>
+        <div id="hand-right" class="hand hand-ai hand-side hand-right"></div>
+      </section>
+
+      <section id="zone-bottom" class="player-zone zone-bottom hidden">
+        <div class="player-label">
+          <span id="pname-bottom"></span>
+          <span id="badge-bottom" class="player-badge"></span>
+        </div>
+        <div id="hand-bottom" class="hand hand-human"></div>
+      </section>
+    </main>
+
+    <aside class="log-panel">
+      <div class="log-title">Spielverlauf</div>
+      <div id="log-messages" class="log-messages"></div>
+    </aside>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
