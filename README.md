@@ -57,6 +57,7 @@ Für GitHub Pages wird die statische Web-App aus `docs/` veröffentlicht.
 
 - `docs/index.html` ist der Einstiegspunkt
 - `docs/.nojekyll` verhindert, dass GitHub Pages die App als Jekyll-Seite behandelt
+- `docs/manifest.webmanifest` und `docs/service-worker.js` machen die App installierbar
 - in GitHub unter `Settings -> Pages` sollte `Deploy from a branch` mit dem Ordner `/docs` gewählt werden
 
 Wenn du lokal neu bauen willst, ist das vorgesehene Kommando:
@@ -64,6 +65,17 @@ Wenn du lokal neu bauen willst, ist das vorgesehene Kommando:
 ```powershell
 npm.cmd run deploy
 ```
+
+## Als Web-App Installieren
+
+Auf iPhone/iPad funktioniert das am zuverlässigsten über die GitHub-Pages-URL, weil diese per HTTPS ausgeliefert wird:
+
+- Seite in Safari öffnen
+- Teilen-Symbol antippen
+- `Zum Home-Bildschirm` wählen
+- danach über das neue App-Icon starten
+
+Lokal mit Live Server kann die App zwar im Browser getestet werden. Der Service Worker und Offline-Cache funktionieren auf Handys aber je nach Browser nur mit HTTPS oder `localhost`.
 
 ## Nächster sinnvoller Ausbau
 

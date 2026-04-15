@@ -1,0 +1,20 @@
+{
+  "name": "Bachmann Jass",
+  "short_name": "Jass",
+  "description": "Bachmann Jass als installierbare Web-App.",
+  "lang": "de-CH",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b2012",
+  "theme_color": "#0b2012",
+  "icons": [
+    {
+      "src": "./app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

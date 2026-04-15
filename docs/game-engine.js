@@ -220,6 +220,9 @@ export function createGame({ variantId = 'bieter', playerName = 'Du' } = {}) {
     trick: [],
     trickLeader: -1,
     trickNumber: 0,
+    capturedCards: { 0: [], 1: [] },
+    capturedTricks: { 0: 0, 1: 0 },
+    lastCapturedPile: null,
     log: [],
     roundSummary: null,
     roundNumber: 0,
@@ -294,6 +297,9 @@ export function startRound(game) {
   game.trick = [];
   game.trickLeader = -1;
   game.trickNumber = 0;
+  game.capturedCards = { 0: [], 1: [] };
+  game.capturedTricks = { 0: 0, 1: 0 };
+  game.lastCapturedPile = null;
   game.roundSummary = null;
 
   const hands = dealHands(game.variant.playerCount, game.variant.dealPacketSize, game.dealer);
@@ -581,6 +587,13 @@ export function trickPoints(trickCards, trumpSuit) {
   return trickCards.reduce((sum, entry) => sum + cardPoints(entry.card, trumpSuit), 0);
 }
 
+export function pileIdForWinner(game, winningPlayer) {
+  if (isSchieber(game)) {
+    return game.players[winningPlayer].teamId;
+  }
+  return winningPlayer === game.soloPlayer ? 0 : 1;
+}
+
 export function playCard(game, playerIndex, cardId) {
   if (game.phase !== 'playing') {
     throw new Error('Nicht in der Spielphase.');
@@ -626,6 +639,7 @@ function teamTricksWon(game, teamId) {
 
 export function resolveTrick(game) {
   const winningPlayer = trickWinner(game.trick, game.trumpSuit);
+  const pileId = pileIdForWinner(game, winningPlayer);
   const isLastTrick = game.trickNumber === game.variant.handSize - 1;
   let points = trickPoints(game.trick, game.trumpSuit);
 
@@ -635,6 +649,9 @@ export function resolveTrick(game) {
 
   game.players[winningPlayer].tricksWon += 1;
   game.players[winningPlayer].pointsWon += points;
+  game.capturedCards[pileId].push(...game.trick.map((entry) => entry.card));
+  game.capturedTricks[pileId] += 1;
+  game.lastCapturedPile = pileId;
   game.trickNumber += 1;
 
   const cardsSummary = game.trick

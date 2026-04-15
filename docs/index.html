@@ -4,6 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Bachmann Jass</title>
+  <meta name="theme-color" content="#0b2012" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Bachmann Jass" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./assets/jasskarten_deck_png_sharper/schilten_under.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./style.css" />
@@ -73,11 +79,25 @@
           <div id="message" class="message"></div>
         </div>
 
-        <div id="trick-table" class="trick-table mode-bieter">
-          <div id="trick-slot-top" class="trick-slot slot-top"></div>
-          <div id="trick-slot-left" class="trick-slot slot-left"></div>
-          <div id="trick-slot-right" class="trick-slot slot-right"></div>
-          <div id="trick-slot-bottom" class="trick-slot slot-bottom"></div>
+        <div class="play-area">
+          <aside id="pile-0" class="stich-pile pile-own">
+            <div id="pile-label-0" class="pile-label">Dein Team</div>
+            <div id="pile-deck-0" class="pile-deck"></div>
+            <div id="pile-count-0" class="pile-count">0 Stiche</div>
+          </aside>
+
+          <div id="trick-table" class="trick-table mode-bieter">
+            <div id="trick-slot-top" class="trick-slot slot-top"></div>
+            <div id="trick-slot-left" class="trick-slot slot-left"></div>
+            <div id="trick-slot-right" class="trick-slot slot-right"></div>
+            <div id="trick-slot-bottom" class="trick-slot slot-bottom"></div>
+          </div>
+
+          <aside id="pile-1" class="stich-pile pile-opponent">
+            <div id="pile-label-1" class="pile-label">Gegner</div>
+            <div id="pile-deck-1" class="pile-deck"></div>
+            <div id="pile-count-1" class="pile-count">0 Stiche</div>
+          </aside>
         </div>
 
         <div class="controls-area">

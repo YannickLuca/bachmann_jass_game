@@ -22,6 +22,7 @@ import {
   getPlayerTeam,
   isBieter,
   isSchieber,
+  pileIdForWinner,
 } from './game-engine.js';
 
 const ZONE_POSITIONS = ['left', 'top', 'right', 'bottom'];
@@ -39,6 +40,7 @@ const AI_DELAYS = {
 let selectedVariantId = 'bieter';
 let game = null;
 let aiLocked = false;
+let animatedTrickCards = new Set();
 
 const screenSetup = document.getElementById('screen-setup');
 const screenGame = document.getElementById('screen-game');
@@ -82,6 +84,12 @@ const badgeEls = Object.fromEntries(
 const trickSlots = Object.fromEntries(
   ZONE_POSITIONS.map((position) => [position, document.getElementById(`trick-slot-${position}`)])
 );
+const pileEls = [0, 1].map((pileId) => ({
+  root: document.getElementById(`pile-${pileId}`),
+  label: document.getElementById(`pile-label-${pileId}`),
+  deck: document.getElementById(`pile-deck-${pileId}`),
+  count: document.getElementById(`pile-count-${pileId}`),
+}));
 
 function escapeHtml(value) {
   return String(value)
@@ -162,9 +170,14 @@ function isSuitBreak(hand, index) {
   return index > 0 && hand[index - 1].suit !== hand[index].suit;
 }
 
-function trickCardEl(card, isWinner) {
+function trickCardEl(card, isWinner, pileId = null, shouldFlyIn = false) {
   const element = document.createElement('div');
-  element.className = `trick-card${isWinner ? ' trick-winner' : ''}`;
+  element.className = [
+    'trick-card',
+    isWinner ? 'trick-winner' : '',
+    pileId !== null ? `fly-to-pile-${pileId}` : '',
+    shouldFlyIn ? 'fly-in' : '',
+  ].filter(Boolean).join(' ');
 
   const image = document.createElement('img');
   image.src = cardImagePath(card);
@@ -173,6 +186,18 @@ function trickCardEl(card, isWinner) {
   element.appendChild(image);
 
   return element;
+}
+
+function pileLabel(pileId) {
+  if (isSchieber(game)) {
+    return pileId === 0 ? 'Dein Team' : 'Gegner-Team';
+  }
+
+  if (game.soloPlayer >= 0) {
+    return pileId === 0 ? `${game.players[game.soloPlayer].name}` : 'Verteidiger';
+  }
+
+  return pileId === 0 ? 'Bieter' : 'Gegner';
 }
 
 function setSetupVariant(variantId) {
@@ -315,6 +340,10 @@ function renderZones() {
 }
 
 function renderTrick() {
+  const capturedPile = game.phase === 'trickEnd'
+    ? pileIdForWinner(game, game.trickLeader)
+    : null;
+
   ZONE_POSITIONS.forEach((position) => {
     const slot = trickSlots[position];
     const playerIndexString = playerIndexForPosition(position);
@@ -328,10 +357,26 @@ function renderTrick() {
     const playerIndex = Number(playerIndexString);
     const player = game.players[playerIndex];
     const entry = game.trick.find((current) => current.playerIndex === playerIndex);
+    const animationKey = entry
+      ? `${game.roundNumber}:${game.trickNumber}:${playerIndex}:${entry.card.id}`
+      : '';
+    const shouldFlyIn = Boolean(entry)
+      && game.phase === 'playing'
+      && !animatedTrickCards.has(animationKey);
+
+    if (shouldFlyIn) {
+      animatedTrickCards.add(animationKey);
+    }
+
     slot.classList.remove('hidden-slot');
 
     if (entry) {
-      slot.appendChild(trickCardEl(entry.card, game.phase === 'trickEnd' && game.trickLeader === playerIndex));
+      slot.appendChild(trickCardEl(
+        entry.card,
+        game.phase === 'trickEnd' && game.trickLeader === playerIndex,
+        capturedPile,
+        shouldFlyIn
+      ));
       return;
     }
 
@@ -339,6 +384,40 @@ function renderTrick() {
     empty.className = 'trick-empty';
     empty.textContent = player.name;
     slot.appendChild(empty);
+  });
+}
+
+function renderCapturedPiles() {
+  pileEls.forEach((pile, pileId) => {
+    const cards = game.capturedCards?.[pileId] || [];
+    const tricks = game.capturedTricks?.[pileId] || 0;
+    const visibleCards = cards.slice(-5);
+
+    pile.root.classList.toggle('pile-highlight', game.phase === 'trickEnd' && game.lastCapturedPile === pileId);
+    pile.label.textContent = pileLabel(pileId);
+    pile.count.textContent = `${tricks} ${tricks === 1 ? 'Stich' : 'Stiche'}`;
+    pile.deck.innerHTML = '';
+
+    if (visibleCards.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'pile-empty-card';
+      pile.deck.appendChild(empty);
+      return;
+    }
+
+    visibleCards.forEach((card, index) => {
+      const element = document.createElement('div');
+      element.className = 'pile-card';
+      element.style.setProperty('--pile-card-index', String(index));
+      element.style.setProperty('--pile-card-turn', `${(index - 2) * 4}deg`);
+
+      const image = document.createElement('img');
+      image.src = cardImagePath(card);
+      image.alt = cardLabel(card);
+      image.draggable = false;
+      element.appendChild(image);
+      pile.deck.appendChild(element);
+    });
   });
 }
 
@@ -505,6 +584,7 @@ function render() {
   renderTrumpDisplay();
   renderZones();
   renderTrick();
+  renderCapturedPiles();
   renderMessage();
   renderControls();
   renderRoundSummary();
@@ -580,6 +660,7 @@ function startSelectedGame() {
   const playerName = playerNameInput.value.trim() || 'Du';
   game = createGame({ variantId: selectedVariantId, playerName });
   aiLocked = false;
+  animatedTrickCards = new Set();
 
   screenSetup.classList.add('hidden');
   screenGame.classList.remove('hidden');
@@ -632,6 +713,7 @@ btnPush.addEventListener('click', () => {
 });
 
 btnNextRound.addEventListener('click', () => {
+  animatedTrickCards = new Set();
   startRound(game);
   gameLoop();
 });
@@ -639,6 +721,7 @@ btnNextRound.addEventListener('click', () => {
 btnNewGame.addEventListener('click', () => {
   game = null;
   aiLocked = false;
+  animatedTrickCards = new Set();
   screenGame.classList.add('hidden');
   screenSetup.classList.remove('hidden');
 });
@@ -651,3 +734,11 @@ SUITS.forEach((suit) => {
     button.textContent = SUIT_LABELS[suit];
   }
 });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {
+      // Local non-HTTPS testing can block service workers; the game still runs.
+    });
+  });
+}
