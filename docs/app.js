@@ -17,9 +17,9 @@ import {
   getPlayableCardsForPlayer,
   aiBidDecision,
   bestTrumpSuit,
+  handValue,
   aiChooseCard,
   getDisplayScore,
-  getPlayerTeam,
   isBieter,
   isSchieber,
   pileIdForWinner,
@@ -55,6 +55,7 @@ const trumpDisplay = document.getElementById('trump-display');
 const logEl = document.getElementById('log-messages');
 const gameModeLabel = document.getElementById('game-mode-label');
 const tableArea = document.getElementById('table-area');
+const playArea = document.querySelector('.play-area');
 const trickTable = document.getElementById('trick-table');
 const bidControls = document.getElementById('bid-controls');
 const bidSelect = document.getElementById('bid-select');
@@ -175,12 +176,12 @@ function isSuitBreak(hand, index) {
   return index > 0 && hand[index - 1].suit !== hand[index].suit;
 }
 
-function trickCardEl(card, isWinner, pileId = null, shouldFlyIn = false) {
+function trickCardEl(card, isWinner, flyTargetClass = '', shouldFlyIn = false) {
   const element = document.createElement('div');
   element.className = [
     'trick-card',
     isWinner ? 'trick-winner' : '',
-    pileId !== null ? `fly-to-pile-${pileId}` : '',
+    flyTargetClass,
     shouldFlyIn ? 'fly-in' : '',
   ].filter(Boolean).join(' ');
 
@@ -203,6 +204,73 @@ function pileLabel(pileId) {
   }
 
   return pileId === 0 ? 'Bieter' : 'Gegner';
+}
+
+function teamRoundPoints(teamId) {
+  return game.players
+    .filter((player) => player.teamId === teamId)
+    .reduce((sum, player) => sum + player.pointsWon, 0);
+}
+
+function teamRoundTricks(teamId) {
+  return game.players
+    .filter((player) => player.teamId === teamId)
+    .reduce((sum, player) => sum + player.tricksWon, 0);
+}
+
+function pileOwnerIndex(pileId) {
+  if (!isSchieber(game)) {
+    return -1;
+  }
+
+  const fallbackTeam = game.teams.find((team) => team.id === pileId);
+  return game.capturedPileOwners?.[pileId] ?? fallbackTeam?.playerIds[0] ?? 0;
+}
+
+function pileOwnerPosition(pileId) {
+  const ownerIndex = pileOwnerIndex(pileId);
+  return PLAYER_POSITIONS[game.variantId][ownerIndex] || 'bottom';
+}
+
+function pileFlyTargetClass(pileId) {
+  if (pileId === null) {
+    return '';
+  }
+
+  if (isSchieber(game)) {
+    return `fly-to-player-${pileOwnerPosition(pileId)}`;
+  }
+
+  return `fly-to-pile-${pileId}`;
+}
+
+function placeCapturedPiles() {
+  if (!isSchieber(game)) {
+    pileEls.forEach((pile) => {
+      pile.root.classList.remove('pile-in-player-zone');
+      delete pile.root.dataset.ownerPosition;
+      delete pile.root.dataset.ownerPlayer;
+    });
+
+    playArea.insertBefore(pileEls[0].root, trickTable);
+    playArea.appendChild(pileEls[1].root);
+    return;
+  }
+
+  pileEls.forEach((pile, pileId) => {
+    const ownerIndex = pileOwnerIndex(pileId);
+    const ownerPosition = pileOwnerPosition(pileId);
+    const zone = zoneEls[ownerPosition];
+    const hand = handEls[ownerPosition];
+
+    pile.root.classList.add('pile-in-player-zone');
+    pile.root.dataset.ownerPosition = ownerPosition;
+    pile.root.dataset.ownerPlayer = String(ownerIndex);
+
+    if (zone && hand) {
+      zone.insertBefore(pile.root, hand);
+    }
+  });
 }
 
 function closeTrickReview() {
@@ -274,33 +342,38 @@ function applyVariantClasses() {
 }
 
 function renderScorePanel() {
-  scorePanel.innerHTML = game.players.map((player) => {
-    const active = player.id === game.currentPlayer && isInteractivePhase();
+  if (isSchieber(game)) {
+    const currentTeamId = game.players[game.currentPlayer]?.teamId;
+    scorePanel.innerHTML = game.teams.map((team) => {
+      const roundPoints = teamRoundPoints(team.id);
+      const tricks = teamRoundTricks(team.id);
+      const active = team.id === currentTeamId && isInteractivePhase();
+      const allied = team.id === game.players[0].teamId;
 
-    if (isBieter(game)) {
-      const isSolo = player.id === game.soloPlayer && game.phase !== 'bidding' && game.phase !== 'setup';
       return `
-        <div class="score-card${active ? ' active' : ''}${isSolo ? ' special' : ''}">
-          <div class="score-name">${escapeHtml(player.name)}</div>
-          <div class="score-total">${getDisplayScore(game, player.id)}</div>
-          <div class="score-sub">/ ${game.variant.targetScore}</div>
-          ${player.bid !== null ? `<div class="score-badge">${player.bid === 0 ? 'Pass' : `Gebot ${player.bid}`}</div>` : ''}
-          ${game.phase !== 'bidding' && game.phase !== 'setup'
-            ? `<div class="score-stats">${player.tricksWon} Stiche | ${player.pointsWon} Pkt</div>`
-            : ''}
+        <div class="score-card score-team${active ? ' active' : ''}${allied ? ' allied' : ''}">
+          <div class="score-name">${escapeHtml(team.name)}</div>
+          <div class="score-total">${roundPoints}</div>
+          <div class="score-sub">Runde | Gesamt ${team.totalScore}/${game.variant.targetScore}</div>
+          <div class="score-stats">${tricks} ${tricks === 1 ? 'Stich' : 'Stiche'} im Team</div>
         </div>
       `;
-    }
+    }).join('');
+    return;
+  }
 
-    const team = getPlayerTeam(game, player.id);
-    const allied = player.teamId === game.players[0].teamId;
-
+  scorePanel.innerHTML = game.players.map((player) => {
+    const active = player.id === game.currentPlayer && isInteractivePhase();
+    const isSolo = player.id === game.soloPlayer && game.phase !== 'bidding' && game.phase !== 'setup';
     return `
-      <div class="score-card${active ? ' active' : ''}${allied ? ' allied' : ''}">
+      <div class="score-card${active ? ' active' : ''}${isSolo ? ' special' : ''}">
         <div class="score-name">${escapeHtml(player.name)}</div>
         <div class="score-total">${getDisplayScore(game, player.id)}</div>
-        <div class="score-sub">${escapeHtml(team ? team.name : '')}</div>
-        <div class="score-stats">${player.tricksWon} Stiche | ${player.pointsWon} Pkt</div>
+        <div class="score-sub">/ ${game.variant.targetScore}</div>
+        ${player.bid !== null ? `<div class="score-badge">${player.bid === 0 ? 'Pass' : `Gebot ${player.bid}`}</div>` : ''}
+        ${game.phase !== 'bidding' && game.phase !== 'setup'
+          ? `<div class="score-stats">${player.tricksWon} Stiche | ${player.pointsWon} Pkt</div>`
+          : ''}
       </div>
     `;
   }).join('');
@@ -391,6 +464,7 @@ function renderTrick() {
   const capturedPile = game.phase === 'trickEnd'
     ? pileIdForWinner(game, game.trickLeader)
     : null;
+  const flyTargetClass = pileFlyTargetClass(capturedPile);
 
   ZONE_POSITIONS.forEach((position) => {
     const slot = trickSlots[position];
@@ -422,7 +496,7 @@ function renderTrick() {
       slot.appendChild(trickCardEl(
         entry.card,
         game.phase === 'trickEnd' && game.trickLeader === playerIndex,
-        capturedPile,
+        flyTargetClass,
         shouldFlyIn
       ));
       return;
@@ -628,6 +702,7 @@ function render() {
 
   gameModeLabel.textContent = game.variant.modeLabel;
   applyVariantClasses();
+  placeCapturedPiles();
   renderScorePanel();
   renderTrumpDisplay();
   renderZones();
@@ -661,6 +736,11 @@ function randomDelay([min, max]) {
   return min + Math.floor(Math.random() * (max - min + 1));
 }
 
+function shouldAiPushTrump(player) {
+  const bestSuit = bestTrumpSuit(player.hand);
+  return handValue(player.hand, bestSuit) < 54;
+}
+
 function gameLoop() {
   render();
 
@@ -679,6 +759,10 @@ function gameLoop() {
 
   if (game.phase === 'chooseTrump' && !currentPlayer.isHuman) {
     queueAiAction(randomDelay(AI_DELAYS.trump), () => {
+      if (canPushTrump(game) && shouldAiPushTrump(currentPlayer)) {
+        pushTrumpChoice(game);
+        return;
+      }
       chooseTrump(game, bestTrumpSuit(currentPlayer.hand));
     });
     return;
@@ -777,7 +861,11 @@ btnNextRound.addEventListener('click', () => {
   gameLoop();
 });
 
-btnHome.addEventListener('click', returnHome);
+btnHome.addEventListener('click', () => {
+  if (window.confirm('Willst du diese Partie wirklich abbrechen und zum Homescreen zurückkehren?')) {
+    returnHome();
+  }
+});
 btnNewGame.addEventListener('click', returnHome);
 btnCloseReview.addEventListener('click', closeTrickReview);
 

@@ -1,6 +1,6 @@
 {
   "name": "Bachmann Jass",
-  "short_name": "Jass",
+  "short_name": "Bachmann Jass",
   "description": "Bachmann Jass als installierbare Web-App.",
   "lang": "de-CH",
   "start_url": "./index.html",
@@ -14,6 +14,12 @@
       "src": "./app-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

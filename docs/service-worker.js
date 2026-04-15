@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bachmann-jass-v2';
+const CACHE_NAME = 'bachmann-jass-v4';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const CORE_ASSETS = [
   './game-engine.js',
   './manifest.webmanifest',
   './app-icon.svg',
+  './app-icon.png',
 ];
 const SUITS = ['eicheln', 'rosen', 'schellen', 'schilten'];
 const RANKS = ['6', '7', '8', '9', '10', 'under', 'ober', 'koenig', 'ass'];

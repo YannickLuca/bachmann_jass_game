@@ -1,25 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Bachmann Jass">
   <defs>
     <linearGradient id="felt" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0" stop-color="#236641" />
-      <stop offset="1" stop-color="#0b2012" />
+      <stop offset="0" stop-color="#256d45" />
+      <stop offset="0.55" stop-color="#123b24" />
+      <stop offset="1" stop-color="#07150d" />
     </linearGradient>
     <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0" stop-color="#f1cf6d" />
-      <stop offset="1" stop-color="#d5a93a" />
+      <stop offset="0" stop-color="#ffe08a" />
+      <stop offset="1" stop-color="#c89321" />
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#felt)" />
-  <circle cx="256" cy="256" r="186" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="18" />
-  <g transform="translate(110 106) rotate(-10 146 152)">
-    <rect x="0" y="0" width="184" height="268" rx="22" fill="#f5edd8" />
-    <rect x="14" y="14" width="156" height="240" rx="16" fill="none" stroke="#d5a93a" stroke-width="9" />
-    <text x="92" y="138" text-anchor="middle" font-family="Georgia, serif" font-size="92" font-weight="700" fill="#8d2323">J</text>
-  </g>
-  <g transform="translate(204 138) rotate(13 98 132)">
-    <rect x="0" y="0" width="172" height="250" rx="22" fill="#f5edd8" />
-    <rect x="14" y="14" width="144" height="222" rx="16" fill="none" stroke="#d5a93a" stroke-width="9" />
-    <text x="86" y="130" text-anchor="middle" font-family="Georgia, serif" font-size="82" font-weight="700" fill="#12351f">A</text>
-  </g>
-  <text x="256" y="420" text-anchor="middle" font-family="Georgia, serif" font-size="58" font-weight="700" fill="url(#gold)">Bachmann</text>
+  <circle cx="256" cy="256" r="184" fill="#ffffff" fill-opacity="0.04" stroke="#ffffff" stroke-opacity="0.16" stroke-width="18" />
+  <path d="M156 392V112h114c33 0 59 7 77 22 18 14 27 35 27 61 0 15-4 29-13 41-8 12-20 21-35 27 19 5 34 15 44 30 11 15 16 32 16 52 0 31-10 55-31 71-20 16-49 24-86 24H156Zm70-167h38c25 0 38-11 38-32 0-12-4-21-12-27-8-6-20-9-35-9h-29v68Zm0 120h42c15 0 27-3 35-10 8-7 12-17 12-30 0-25-13-37-40-38h-49v78Z" fill="url(#gold)" />
+  <path d="M156 392V112h114c33 0 59 7 77 22 18 14 27 35 27 61 0 15-4 29-13 41-8 12-20 21-35 27 19 5 34 15 44 30 11 15 16 32 16 52 0 31-10 55-31 71-20 16-49 24-86 24H156Z" fill="none" stroke="#000000" stroke-opacity="0.22" stroke-width="10" stroke-linejoin="round" />
 </svg>

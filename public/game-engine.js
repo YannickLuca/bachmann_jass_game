@@ -48,6 +48,7 @@ const TRUMP_ORDER = ['6', '7', '8', '10', 'ober', 'koenig', 'ass', '9', 'under']
 const HAND_SUIT_ORDER = ['rosen', 'eicheln', 'schellen', 'schilten'];
 const HAND_SUIT_INDEX = Object.fromEntries(HAND_SUIT_ORDER.map((suit, index) => [suit, index]));
 const HAND_RANK_INDEX = Object.fromEntries(BASE_ORDER.map((rank, index) => [rank, index]));
+const SCHIEBER_START_CARD_ID = 'rosen_7';
 
 export const BID_VALUES = [0, 60, 70, 80, 90, 100, 110, 120, 130, 140, 157];
 
@@ -82,7 +83,7 @@ export const GAME_VARIANTS = {
     rules: [
       '36 Karten (6 bis Ass), 9 Karten pro Spieler, in 3er-Paketen verteilt.',
       'Es wird zu viert in festen Teams gespielt: du mit Partner gegen 2 Computer.',
-      'Vorhand wählt Trumpf oder schiebt die Wahl einmal an den Partner weiter.',
+      'Wer die Rosen 7 hat, ist Vorhand, wählt Trumpf oder schiebt die Wahl einmal an den Partner weiter.',
       'Bedienpflicht und Trumpfregeln sind als saubere Grundversion umgesetzt.',
       'Keine Weis-, Stöck-, Obenabe- oder Undenufe-Regeln in dieser ersten Ausbaustufe.',
       'Teamwertung: die Stichpunkte werden pro Runde addiert. Ziel: zuerst 1000 Punkte.',
@@ -191,8 +192,8 @@ function createTeams(variantId, players) {
   }
 
   return [
-    { id: 0, name: `${players[0].name} & ${players[2].name}`, playerIds: [0, 2], totalScore: 0 },
-    { id: 1, name: `${players[1].name} & ${players[3].name}`, playerIds: [1, 3], totalScore: 0 },
+    { id: 0, name: `${players[2].name} + ${players[0].name}`, playerIds: [0, 2], totalScore: 0 },
+    { id: 1, name: `${players[1].name} + ${players[3].name}`, playerIds: [1, 3], totalScore: 0 },
   ];
 }
 
@@ -222,6 +223,7 @@ export function createGame({ variantId = 'bieter', playerName = 'Du' } = {}) {
     trickNumber: 0,
     capturedCards: { 0: [], 1: [] },
     capturedTricks: { 0: 0, 1: 0 },
+    capturedPileOwners: { 0: 0, 1: 1 },
     firstCapturedTrick: null,
     lastCapturedPile: null,
     log: [],
@@ -282,6 +284,11 @@ function roundHeader(game) {
   return `Runde ${game.roundNumber} - ${game.variant.label} - Geber: ${game.players[game.dealer].name}`;
 }
 
+function playerIndexWithCard(hands, cardId) {
+  const playerIndex = hands.findIndex((hand) => hand.some((card) => card.id === cardId));
+  return playerIndex >= 0 ? playerIndex : 0;
+}
+
 export function startRound(game) {
   game.roundNumber += 1;
   game.dealer = (game.dealer + 1) % game.players.length;
@@ -300,6 +307,7 @@ export function startRound(game) {
   game.trickNumber = 0;
   game.capturedCards = { 0: [], 1: [] };
   game.capturedTricks = { 0: 0, 1: 0 };
+  game.capturedPileOwners = { 0: 0, 1: 1 };
   game.firstCapturedTrick = null;
   game.lastCapturedPile = null;
   game.roundSummary = null;
@@ -326,11 +334,11 @@ export function startRound(game) {
     return;
   }
 
-  game.forehandPlayer = nextPlayerIndex(game, game.dealer);
+  game.forehandPlayer = playerIndexWithCard(hands, SCHIEBER_START_CARD_ID);
   game.chooserPlayer = game.forehandPlayer;
   game.currentPlayer = game.forehandPlayer;
   game.phase = 'chooseTrump';
-  game.log.push(`${game.players[game.forehandPlayer].name} ist Vorhand und wählt Trumpf oder schiebt.`);
+  game.log.push(`${game.players[game.forehandPlayer].name} hat die Rosen 7, ist Vorhand und wählt Trumpf oder schiebt.`);
 }
 
 export function submitBid(game, playerIndex, bidValue) {
@@ -651,6 +659,7 @@ export function resolveTrick(game) {
 
   game.players[winningPlayer].tricksWon += 1;
   game.players[winningPlayer].pointsWon += points;
+  game.capturedPileOwners[pileId] = winningPlayer;
 
   if (game.trickNumber === 0) {
     game.firstCapturedTrick = {
