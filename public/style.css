@@ -15,6 +15,8 @@
   --card-h: calc(var(--card-w) * 1.444);
   --card-r: 14px;
   --hand-overlap: calc(var(--card-w) * -0.64);
+  --ai-card-w: clamp(68px, 6.2vw, 104px);
+  --ai-hand-overlap: calc(var(--ai-card-w) * -0.68);
   --pile-card-w: calc(var(--card-w) * 0.54);
   --pile-card-h: calc(var(--pile-card-w) * 1.444);
   --shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
@@ -364,7 +366,7 @@ body {
   grid-template-rows: auto 1fr auto;
   gap: 0.75rem;
   padding: 0.8rem;
-  overflow: hidden;
+  overflow: visible;
   align-items: center;
   min-height: 0;
 }
@@ -379,6 +381,7 @@ body {
   gap: 0.45rem;
   align-items: center;
   min-width: 0;
+  overflow: visible;
 }
 
 .zone-left {
@@ -388,6 +391,11 @@ body {
 
 .zone-top {
   grid-area: top;
+  position: relative;
+  width: min(100%, 760px);
+  justify-self: center;
+  min-height: calc(var(--ai-card-w) * 1.72);
+  overflow: visible;
 }
 
 .zone-right {
@@ -434,17 +442,18 @@ body {
 .hand {
   display: flex;
   gap: 0;
+  overflow: visible;
 }
 
 .hand-side {
-  flex-direction: column;
-  max-height: min(42vh, calc(var(--card-h) * 2.25));
-  overflow: hidden;
+  flex-direction: row;
+  max-width: min(34vw, 320px);
+  overflow: visible;
 }
 
 .hand-top {
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow: visible;
   justify-content: center;
   max-width: min(78vw, 720px);
 }
@@ -463,12 +472,18 @@ body {
   transform: translateY(0.25rem);
 }
 
-.hand-side .card + .card {
-  margin-top: calc(var(--card-h) * -0.82);
+.hand-ai .card {
+  width: var(--ai-card-w);
+  height: calc(var(--ai-card-w) * 1.444);
+  border-radius: calc(var(--card-r) * 0.82);
+  z-index: var(--fan-z, 1);
+  margin-left: var(--ai-hand-overlap);
+  transform: translateY(var(--fan-y, 0px)) rotate(var(--fan-angle, 0deg));
+  transform-origin: 50% 120%;
 }
 
-.hand-top .card + .card {
-  margin-left: calc(var(--card-w) * -0.68);
+.hand-ai .card:first-child {
+  margin-left: 0;
 }
 
 .hand-human .card {
@@ -615,13 +630,13 @@ body {
 
 .trick-table {
   position: relative;
-  width: min(520px, 46vw);
-  height: min(500px, 47vh);
-  min-height: calc(var(--card-h) * 1.85);
+  width: min(460px, 44vw);
+  height: min(420px, 42vh);
+  min-height: calc(var(--card-h) * 1.45);
 }
 
 .trick-table.mode-bieter {
-  height: min(470px, 43vh);
+  height: min(390px, 39vh);
 }
 
 .trick-slot {
@@ -657,6 +672,24 @@ body {
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
+}
+
+.trick-table .trick-slot {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  border-color: transparent;
+  background: transparent;
+  transform:
+    translate(-50%, -50%)
+    translate(var(--stack-x, 0), var(--stack-y, 0))
+    rotate(var(--stack-angle, 0deg));
+  z-index: var(--stack-z, 1);
+}
+
+.trick-table .trick-slot.has-card {
+  border-color: transparent;
 }
 
 .hidden-slot {
@@ -818,6 +851,13 @@ body {
   padding: 0.45rem 0.32rem;
   background: rgba(0, 0, 0, 0.3);
   z-index: 5;
+}
+
+.zone-top .stich-pile.pile-in-player-zone[data-pile-id="0"] {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-40%);
 }
 
 .zone-left .stich-pile.pile-in-player-zone {
@@ -1155,6 +1195,8 @@ body {
     --card-h: calc(var(--card-w) * 1.444);
     --card-r: 11px;
     --hand-overlap: calc(var(--card-w) * -0.72);
+    --ai-card-w: clamp(42px, 11vw, 58px);
+    --ai-hand-overlap: calc(var(--ai-card-w) * -0.7);
     --pile-card-w: calc(var(--card-w) * 0.48);
   }
 
@@ -1257,6 +1299,11 @@ body {
     max-width: min(64vw, 220px);
   }
 
+  .zone-top {
+    width: 100%;
+    min-height: calc(var(--ai-card-w) * 1.9);
+  }
+
   .center-zone {
     gap: 0.35rem;
     justify-content: center;
@@ -1319,6 +1366,10 @@ body {
     border-radius: 10px;
   }
 
+  .zone-top .stich-pile.pile-in-player-zone[data-pile-id="0"] {
+    right: -2px;
+  }
+
   .pile-label {
     display: none;
   }
@@ -1354,15 +1405,18 @@ body {
   }
 
   .hand-side {
-    max-height: min(34dvh, 214px);
+    max-width: min(30vw, 130px);
+    max-height: none;
+    overflow: visible;
   }
 
   .hand-side .card + .card {
-    margin-top: calc(var(--card-h) * -0.86);
+    margin-top: 0;
+    margin-left: var(--ai-hand-overlap);
   }
 
   .hand-top .card + .card {
-    margin-left: calc(var(--card-w) * -0.78);
+    margin-left: var(--ai-hand-overlap);
   }
 
   .hand-human {
@@ -1405,6 +1459,8 @@ body {
     --card-w: clamp(78px, 23vw, 92px);
     --card-h: calc(var(--card-w) * 1.444);
     --hand-overlap: calc(var(--card-w) * -0.73);
+    --ai-card-w: clamp(38px, 10vw, 52px);
+    --ai-hand-overlap: calc(var(--ai-card-w) * -0.72);
   }
 
   .setup-box {
@@ -1448,6 +1504,8 @@ body {
     --card-w: clamp(70px, 21vw, 84px);
     --card-h: calc(var(--card-w) * 1.444);
     --hand-overlap: calc(var(--card-w) * -0.74);
+    --ai-card-w: clamp(34px, 9.5vw, 46px);
+    --ai-hand-overlap: calc(var(--ai-card-w) * -0.73);
   }
 
   .table-area {

@@ -228,6 +228,10 @@ function pileOwnerIndex(pileId) {
 }
 
 function pileOwnerPosition(pileId) {
+  if (isSchieber(game) && pileId === 0) {
+    return 'top';
+  }
+
   const ownerIndex = pileOwnerIndex(pileId);
   return PLAYER_POSITIONS[game.variantId][ownerIndex] || 'bottom';
 }
@@ -264,11 +268,16 @@ function placeCapturedPiles() {
     const hand = handEls[ownerPosition];
 
     pile.root.classList.add('pile-in-player-zone');
+    pile.root.dataset.pileId = String(pileId);
     pile.root.dataset.ownerPosition = ownerPosition;
     pile.root.dataset.ownerPlayer = String(ownerIndex);
 
     if (zone && hand) {
-      zone.insertBefore(pile.root, hand);
+      if (pileId === 0) {
+        zone.appendChild(pile.root);
+      } else {
+        zone.insertBefore(pile.root, hand);
+      }
     }
   });
 }
@@ -454,8 +463,10 @@ function renderZones() {
       return;
     }
 
-    player.hand.forEach(() => {
-      handEl.appendChild(cardBackEl());
+    player.hand.forEach((_, cardIndex) => {
+      const element = cardBackEl();
+      applyFanStyle(element, cardIndex, player.hand.length);
+      handEl.appendChild(element);
     });
   });
 }
@@ -470,6 +481,11 @@ function renderTrick() {
     const slot = trickSlots[position];
     const playerIndexString = playerIndexForPosition(position);
     slot.innerHTML = '';
+    slot.classList.remove('has-card');
+    slot.style.removeProperty('--stack-x');
+    slot.style.removeProperty('--stack-y');
+    slot.style.removeProperty('--stack-angle');
+    slot.style.removeProperty('--stack-z');
 
     if (playerIndexString === undefined) {
       slot.classList.add('hidden-slot');
@@ -477,8 +493,8 @@ function renderTrick() {
     }
 
     const playerIndex = Number(playerIndexString);
-    const player = game.players[playerIndex];
     const entry = game.trick.find((current) => current.playerIndex === playerIndex);
+    const trickIndex = game.trick.findIndex((current) => current.playerIndex === playerIndex);
     const animationKey = entry
       ? `${game.roundNumber}:${game.trickNumber}:${playerIndex}:${entry.card.id}`
       : '';
@@ -493,6 +509,18 @@ function renderTrick() {
     slot.classList.remove('hidden-slot');
 
     if (entry) {
+      const offsets = [
+        { x: -12, y: 4, angle: -8 },
+        { x: 8, y: -5, angle: 6 },
+        { x: -2, y: 12, angle: -2 },
+        { x: 15, y: 8, angle: 10 },
+      ];
+      const offset = offsets[trickIndex] || offsets[0];
+      slot.classList.add('has-card');
+      slot.style.setProperty('--stack-x', `${offset.x}px`);
+      slot.style.setProperty('--stack-y', `${offset.y}px`);
+      slot.style.setProperty('--stack-angle', `${offset.angle}deg`);
+      slot.style.setProperty('--stack-z', String(10 + trickIndex));
       slot.appendChild(trickCardEl(
         entry.card,
         game.phase === 'trickEnd' && game.trickLeader === playerIndex,
@@ -502,10 +530,7 @@ function renderTrick() {
       return;
     }
 
-    const empty = document.createElement('div');
-    empty.className = 'trick-empty';
-    empty.textContent = player.name;
-    slot.appendChild(empty);
+    slot.classList.add('hidden-slot');
   });
 }
 
