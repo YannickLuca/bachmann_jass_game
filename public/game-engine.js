@@ -45,6 +45,9 @@ const TRUMP_POINTS = {
 
 const BASE_ORDER = ['6', '7', '8', '9', '10', 'under', 'ober', 'koenig', 'ass'];
 const TRUMP_ORDER = ['6', '7', '8', '10', 'ober', 'koenig', 'ass', '9', 'under'];
+const HAND_SUIT_ORDER = ['rosen', 'eicheln', 'schellen', 'schilten'];
+const HAND_SUIT_INDEX = Object.fromEntries(HAND_SUIT_ORDER.map((suit, index) => [suit, index]));
+const HAND_RANK_INDEX = Object.fromEntries(BASE_ORDER.map((rank, index) => [rank, index]));
 
 export const BID_VALUES = [0, 60, 70, 80, 90, 100, 110, 120, 130, 140, 157];
 
@@ -55,10 +58,11 @@ export const GAME_VARIANTS = {
     setupSubtitle: '3 Spieler - du spielst alleine gegen 2 Computer',
     playerCount: 3,
     handSize: 12,
+    dealPacketSize: 3,
     targetScore: 1500,
     modeLabel: 'Bieterjass',
     rules: [
-      '36 Karten (6 bis Ass), 12 Karten pro Spieler.',
+      '36 Karten (6 bis Ass), 12 Karten pro Spieler, in 3er-Paketen verteilt.',
       'Jeder bietet genau einmal. Das höchste Gebot spielt alleine gegen die anderen zwei.',
       'Der Höchstbietende wählt die Trumpffarbe.',
       'Vereinfachte Bedienpflicht mit Trumpfstechen wie in der bisherigen Lokalversion.',
@@ -72,10 +76,11 @@ export const GAME_VARIANTS = {
     setupSubtitle: '4 Spieler - du spielst mit einem Partner gegen 2 Computer',
     playerCount: 4,
     handSize: 9,
+    dealPacketSize: 3,
     targetScore: 1000,
     modeLabel: 'Schieber',
     rules: [
-      '36 Karten (6 bis Ass), 9 Karten pro Spieler.',
+      '36 Karten (6 bis Ass), 9 Karten pro Spieler, in 3er-Paketen verteilt.',
       'Es wird zu viert in festen Teams gespielt: du mit Partner gegen 2 Computer.',
       'Vorhand wählt Trumpf oder schiebt die Wahl einmal an den Partner weiter.',
       'Bedienpflicht und Trumpfregeln sind als saubere Grundversion umgesetzt.',
@@ -129,20 +134,38 @@ function shuffle(cards) {
 }
 
 export function sortPlayerHand(hand, trumpSuit) {
-  const suitOrder = { eicheln: 0, rosen: 1, schellen: 2, schilten: 3 };
   return [...hand].sort((first, second) => {
     if (first.suit !== second.suit) {
-      return suitOrder[first.suit] - suitOrder[second.suit];
+      return HAND_SUIT_INDEX[first.suit] - HAND_SUIT_INDEX[second.suit];
     }
-    return rankIndex(second, trumpSuit || '') - rankIndex(first, trumpSuit || '');
+    return HAND_RANK_INDEX[first.rank] - HAND_RANK_INDEX[second.rank];
   });
 }
 
-export function dealHands(playerCount) {
+export function dealHands(playerCount, packetSize = 3, dealer = playerCount - 1) {
   const shuffled = shuffle(createDeck());
-  return Array.from({ length: playerCount }, (_, playerIndex) =>
-    shuffled.filter((_, index) => index % playerCount === playerIndex)
+  const hands = Array.from({ length: playerCount }, () => []);
+  const dealOrder = Array.from(
+    { length: playerCount },
+    (_, index) => (dealer + 1 + index) % playerCount
   );
+  const targetHandSize = shuffled.length / playerCount;
+  let deckIndex = 0;
+
+  while (deckIndex < shuffled.length) {
+    for (const playerIndex of dealOrder) {
+      for (
+        let packetCard = 0;
+        packetCard < packetSize && hands[playerIndex].length < targetHandSize && deckIndex < shuffled.length;
+        packetCard += 1
+      ) {
+        hands[playerIndex].push(shuffled[deckIndex]);
+        deckIndex += 1;
+      }
+    }
+  }
+
+  return hands;
 }
 
 function createPlayers(variantId, playerName) {
@@ -273,13 +296,14 @@ export function startRound(game) {
   game.trickNumber = 0;
   game.roundSummary = null;
 
-  const hands = dealHands(game.variant.playerCount);
+  const hands = dealHands(game.variant.playerCount, game.variant.dealPacketSize, game.dealer);
   game.players.forEach((player, playerIndex) => {
     resetRoundPlayerState(player);
     player.hand = sortPlayerHand(hands[playerIndex], '');
   });
 
   game.log = [roundHeader(game)];
+  game.log.push(`Gemischt und in ${game.variant.dealPacketSize}er-Paketen verteilt.`);
 
   if (isBieter(game)) {
     const order = [];

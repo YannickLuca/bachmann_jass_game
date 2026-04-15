@@ -29,6 +29,12 @@ const PLAYER_POSITIONS = {
   bieter: { 0: 'bottom', 1: 'left', 2: 'right' },
   schieber: { 0: 'bottom', 1: 'left', 2: 'top', 3: 'right' },
 };
+const AI_DELAYS = {
+  bidding: [1200, 2100],
+  trump: [1500, 2600],
+  card: [1500, 2700],
+  trickEnd: [1700, 2500],
+};
 
 let selectedVariantId = 'bieter';
 let game = null;
@@ -139,6 +145,21 @@ function cardFaceEl(card, isPlayable, onClick) {
   }
 
   return element;
+}
+
+function applyFanStyle(element, index, count) {
+  const center = (count - 1) / 2;
+  const offset = index - center;
+  const angle = Math.max(-22, Math.min(22, offset * 4.2));
+  const yOffset = Math.abs(offset) * 2.8;
+
+  element.style.setProperty('--fan-angle', `${angle}deg`);
+  element.style.setProperty('--fan-y', `${yOffset}px`);
+  element.style.setProperty('--fan-z', String(index + 1));
+}
+
+function isSuitBreak(hand, index) {
+  return index > 0 && hand[index - 1].suit !== hand[index].suit;
 }
 
 function trickCardEl(card, isWinner) {
@@ -259,7 +280,7 @@ function renderZones() {
       const playableCards = humanTurn ? getPlayableCardsForPlayer(game, playerIndex) : [];
       const playableIds = new Set(playableCards.map((card) => card.id));
 
-      player.hand.forEach((card) => {
+      player.hand.forEach((card, cardIndex) => {
         const playable = humanTurn && playableIds.has(card.id);
         const element = cardFaceEl(card, playable, playable ? () => {
           try {
@@ -276,6 +297,11 @@ function renderZones() {
         if (humanTurn && !playable) {
           element.classList.add('dimmed');
         }
+        if (isSuitBreak(player.hand, cardIndex)) {
+          element.classList.add('suit-break');
+        }
+
+        applyFanStyle(element, cardIndex, player.hand.length);
 
         handEl.appendChild(element);
       });
@@ -503,6 +529,10 @@ function queueAiAction(delayMs, action) {
   }, delayMs);
 }
 
+function randomDelay([min, max]) {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
 function gameLoop() {
   render();
 
@@ -513,21 +543,21 @@ function gameLoop() {
   const currentPlayer = game.players[game.currentPlayer];
 
   if (game.phase === 'bidding' && !currentPlayer.isHuman) {
-    queueAiAction(700, () => {
+    queueAiAction(randomDelay(AI_DELAYS.bidding), () => {
       submitBid(game, game.currentPlayer, aiBidDecision(currentPlayer.hand, game.highestBid));
     });
     return;
   }
 
   if (game.phase === 'chooseTrump' && !currentPlayer.isHuman) {
-    queueAiAction(800, () => {
+    queueAiAction(randomDelay(AI_DELAYS.trump), () => {
       chooseTrump(game, bestTrumpSuit(currentPlayer.hand));
     });
     return;
   }
 
   if (game.phase === 'playing' && !currentPlayer.isHuman) {
-    queueAiAction(900, () => {
+    queueAiAction(randomDelay(AI_DELAYS.card), () => {
       const card = aiChooseCard(game, game.currentPlayer);
       const trickComplete = playCard(game, game.currentPlayer, card.id);
       if (trickComplete) {
@@ -538,7 +568,7 @@ function gameLoop() {
   }
 
   if (game.phase === 'trickEnd') {
-    queueAiAction(1300, () => {
+    queueAiAction(randomDelay(AI_DELAYS.trickEnd), () => {
       if (game.phase === 'trickEnd') {
         startNextTrick(game);
       }
