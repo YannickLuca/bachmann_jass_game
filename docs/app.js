@@ -68,6 +68,11 @@ const btnNextRound = document.getElementById('btn-next-round');
 const gameOverControls = document.getElementById('game-over-controls');
 const gameOverMsg = document.getElementById('game-over-msg');
 const btnNewGame = document.getElementById('btn-new-game');
+const btnHome = document.getElementById('btn-home');
+const trickReview = document.getElementById('trick-review');
+const trickReviewText = document.getElementById('trick-review-text');
+const trickReviewCards = document.getElementById('trick-review-cards');
+const btnCloseReview = document.getElementById('btn-close-review');
 
 const zoneEls = Object.fromEntries(
   ZONE_POSITIONS.map((position) => [position, document.getElementById(`zone-${position}`)])
@@ -198,6 +203,49 @@ function pileLabel(pileId) {
   }
 
   return pileId === 0 ? 'Bieter' : 'Gegner';
+}
+
+function closeTrickReview() {
+  trickReview.classList.add('hidden');
+  trickReviewText.textContent = '';
+  trickReviewCards.innerHTML = '';
+}
+
+function openFirstTrickReview(pileId) {
+  if (!game?.firstCapturedTrick) {
+    msgEl.textContent = 'Nach dem ersten Stich kannst du ihn hier nochmals ansehen.';
+    return;
+  }
+
+  if (game.firstCapturedTrick.pileId !== pileId) {
+    msgEl.textContent = 'Der erste Stich liegt nicht in diesem Stapel.';
+    return;
+  }
+
+  const firstTrick = game.firstCapturedTrick;
+  const winner = game.players[firstTrick.winner];
+  trickReviewText.textContent = `${winner.name} hat diesen ersten Stich gewonnen.`;
+  trickReviewCards.innerHTML = '';
+
+  firstTrick.cards.forEach(({ playerIndex, card }) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = `review-card${playerIndex === firstTrick.winner ? ' review-card-winner' : ''}`;
+
+    const image = document.createElement('img');
+    image.src = cardImagePath(card);
+    image.alt = cardLabel(card);
+    image.draggable = false;
+
+    const caption = document.createElement('div');
+    caption.className = 'review-card-name';
+    caption.textContent = game.players[playerIndex].name;
+
+    wrapper.appendChild(image);
+    wrapper.appendChild(caption);
+    trickReviewCards.appendChild(wrapper);
+  });
+
+  trickReview.classList.remove('hidden');
 }
 
 function setSetupVariant(variantId) {
@@ -391,31 +439,31 @@ function renderCapturedPiles() {
   pileEls.forEach((pile, pileId) => {
     const cards = game.capturedCards?.[pileId] || [];
     const tricks = game.capturedTricks?.[pileId] || 0;
-    const visibleCards = cards.slice(-5);
+    const stackSize = Math.min(5, cards.length);
+    const reviewable = game.firstCapturedTrick?.pileId === pileId;
+    const label = pileLabel(pileId);
 
     pile.root.classList.toggle('pile-highlight', game.phase === 'trickEnd' && game.lastCapturedPile === pileId);
-    pile.label.textContent = pileLabel(pileId);
+    pile.root.classList.toggle('pile-reviewable', reviewable);
+    pile.root.tabIndex = reviewable ? 0 : -1;
+    pile.root.title = reviewable ? 'Ersten Stich nochmals ansehen' : '';
+    pile.root.setAttribute('aria-label', reviewable ? `${label}: ersten Stich nochmals ansehen` : label);
+    pile.label.textContent = label;
     pile.count.textContent = `${tricks} ${tricks === 1 ? 'Stich' : 'Stiche'}`;
     pile.deck.innerHTML = '';
 
-    if (visibleCards.length === 0) {
+    if (stackSize === 0) {
       const empty = document.createElement('div');
       empty.className = 'pile-empty-card';
       pile.deck.appendChild(empty);
       return;
     }
 
-    visibleCards.forEach((card, index) => {
+    Array.from({ length: stackSize }).forEach((_, index) => {
       const element = document.createElement('div');
-      element.className = 'pile-card';
+      element.className = 'pile-card pile-card-back';
       element.style.setProperty('--pile-card-index', String(index));
       element.style.setProperty('--pile-card-turn', `${(index - 2) * 4}deg`);
-
-      const image = document.createElement('img');
-      image.src = cardImagePath(card);
-      image.alt = cardLabel(card);
-      image.draggable = false;
-      element.appendChild(image);
       pile.deck.appendChild(element);
     });
   });
@@ -661,12 +709,22 @@ function startSelectedGame() {
   game = createGame({ variantId: selectedVariantId, playerName });
   aiLocked = false;
   animatedTrickCards = new Set();
+  closeTrickReview();
 
   screenSetup.classList.add('hidden');
   screenGame.classList.remove('hidden');
 
   startRound(game);
   gameLoop();
+}
+
+function returnHome() {
+  game = null;
+  aiLocked = false;
+  animatedTrickCards = new Set();
+  closeTrickReview();
+  screenGame.classList.add('hidden');
+  screenSetup.classList.remove('hidden');
 }
 
 variantCards.forEach((card) => {
@@ -714,16 +772,35 @@ btnPush.addEventListener('click', () => {
 
 btnNextRound.addEventListener('click', () => {
   animatedTrickCards = new Set();
+  closeTrickReview();
   startRound(game);
   gameLoop();
 });
 
-btnNewGame.addEventListener('click', () => {
-  game = null;
-  aiLocked = false;
-  animatedTrickCards = new Set();
-  screenGame.classList.add('hidden');
-  screenSetup.classList.remove('hidden');
+btnHome.addEventListener('click', returnHome);
+btnNewGame.addEventListener('click', returnHome);
+btnCloseReview.addEventListener('click', closeTrickReview);
+
+trickReview.addEventListener('click', (event) => {
+  if (event.target === trickReview) {
+    closeTrickReview();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !trickReview.classList.contains('hidden')) {
+    closeTrickReview();
+  }
+});
+
+pileEls.forEach((pile, pileId) => {
+  pile.root.addEventListener('click', () => openFirstTrickReview(pileId));
+  pile.root.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openFirstTrickReview(pileId);
+    }
+  });
 });
 
 setSetupVariant(selectedVariantId);

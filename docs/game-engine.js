@@ -172,16 +172,16 @@ function createPlayers(variantId, playerName) {
   if (variantId === 'bieter') {
     return [
       { id: 0, name: playerName, isHuman: true, teamId: 0, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
-      { id: 1, name: 'Computer 1', isHuman: false, teamId: 1, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
-      { id: 2, name: 'Computer 2', isHuman: false, teamId: 1, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
+      { id: 1, name: 'Yannick', isHuman: false, teamId: 1, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
+      { id: 2, name: 'Papsli', isHuman: false, teamId: 1, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
     ];
   }
 
   return [
     { id: 0, name: playerName, isHuman: true, teamId: 0, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
-    { id: 1, name: 'Computer Links', isHuman: false, teamId: 1, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
-    { id: 2, name: 'Partner', isHuman: false, teamId: 0, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
-    { id: 3, name: 'Computer Rechts', isHuman: false, teamId: 1, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
+    { id: 1, name: 'Yannick', isHuman: false, teamId: 1, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
+    { id: 2, name: 'Papsli', isHuman: false, teamId: 0, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
+    { id: 3, name: 'Gusti', isHuman: false, teamId: 1, hand: [], bid: null, tricksWon: 0, pointsWon: 0, totalScore: 0 },
   ];
 }
 
@@ -222,6 +222,7 @@ export function createGame({ variantId = 'bieter', playerName = 'Du' } = {}) {
     trickNumber: 0,
     capturedCards: { 0: [], 1: [] },
     capturedTricks: { 0: 0, 1: 0 },
+    firstCapturedTrick: null,
     lastCapturedPile: null,
     log: [],
     roundSummary: null,
@@ -299,6 +300,7 @@ export function startRound(game) {
   game.trickNumber = 0;
   game.capturedCards = { 0: [], 1: [] };
   game.capturedTricks = { 0: 0, 1: 0 };
+  game.firstCapturedTrick = null;
   game.lastCapturedPile = null;
   game.roundSummary = null;
 
@@ -649,6 +651,18 @@ export function resolveTrick(game) {
 
   game.players[winningPlayer].tricksWon += 1;
   game.players[winningPlayer].pointsWon += points;
+
+  if (game.trickNumber === 0) {
+    game.firstCapturedTrick = {
+      pileId,
+      winner: winningPlayer,
+      cards: game.trick.map((entry) => ({
+        playerIndex: entry.playerIndex,
+        card: entry.card,
+      })),
+    };
+  }
+
   game.capturedCards[pileId].push(...game.trick.map((entry) => entry.card));
   game.capturedTricks[pileId] += 1;
   game.lastCapturedPile = pileId;

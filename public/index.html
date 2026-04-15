@@ -53,7 +53,10 @@
         <span class="game-title">Bachmann Jass</span>
         <span id="game-mode-label" class="game-mode-label">Bieterjass</span>
       </div>
-      <div id="score-panel" class="score-panel"></div>
+      <div class="top-actions">
+        <div id="score-panel" class="score-panel"></div>
+        <button id="btn-home" class="btn btn-secondary btn-home" type="button">Home</button>
+      </div>
     </header>
 
     <main id="table-area" class="table-area mode-bieter">
@@ -149,6 +152,16 @@
       <div class="log-title">Spielverlauf</div>
       <div id="log-messages" class="log-messages"></div>
     </aside>
+
+    <div id="trick-review" class="trick-review hidden" role="dialog" aria-modal="true" aria-labelledby="trick-review-title">
+      <div class="trick-review-box">
+        <button id="btn-close-review" class="review-close" type="button" aria-label="Ansicht schliessen">&times;</button>
+        <div class="review-kicker">Nochmals anschauen</div>
+        <h2 id="trick-review-title">Erster Stich</h2>
+        <p id="trick-review-text" class="trick-review-text"></p>
+        <div id="trick-review-cards" class="trick-review-cards"></div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="./app.js"></script>
