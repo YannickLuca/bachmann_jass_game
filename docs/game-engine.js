@@ -6,6 +6,18 @@ export const SUIT_LABELS = {
   schilten: 'Schilten',
 };
 
+export const ROUND_MODE_OPTIONS = [...SUITS, 'obeAbe', 'uneUfe'];
+export const ROUND_MODE_LABELS = {
+  eicheln: 'Eicheln',
+  rosen: 'Rosen',
+  schellen: 'Schellen',
+  schilten: 'Schilten',
+  obeAbe: 'Obe-Abe',
+  uneUfe: 'Une-Ufe',
+};
+
+export const SCHIEBER_TARGET_SCORES = [1000, 2500];
+
 export const RANKS = ['6', '7', '8', '9', '10', 'under', 'ober', 'koenig', 'ass'];
 export const RANK_LABELS = {
   '6': '6',
@@ -15,7 +27,7 @@ export const RANK_LABELS = {
   '10': '10',
   under: 'Under',
   ober: 'Ober',
-  koenig: 'König',
+  koenig: 'Koenig',
   ass: 'Ass',
 };
 
@@ -43,12 +55,47 @@ const TRUMP_POINTS = {
   '6': 0,
 };
 
+const OBE_ABE_POINTS = {
+  ass: 11,
+  koenig: 4,
+  ober: 3,
+  under: 2,
+  '10': 10,
+  '9': 0,
+  '8': 8,
+  '7': 0,
+  '6': 0,
+};
+
+const UNE_UFE_POINTS = {
+  ass: 0,
+  koenig: 4,
+  ober: 3,
+  under: 2,
+  '10': 10,
+  '9': 0,
+  '8': 8,
+  '7': 0,
+  '6': 11,
+};
+
 const BASE_ORDER = ['6', '7', '8', '9', '10', 'under', 'ober', 'koenig', 'ass'];
 const TRUMP_ORDER = ['6', '7', '8', '10', 'ober', 'koenig', 'ass', '9', 'under'];
+const UNE_UFE_ORDER = ['ass', 'koenig', 'ober', 'under', '10', '9', '8', '7', '6'];
 const HAND_SUIT_ORDER = ['rosen', 'eicheln', 'schellen', 'schilten'];
 const HAND_SUIT_INDEX = Object.fromEntries(HAND_SUIT_ORDER.map((suit, index) => [suit, index]));
 const HAND_RANK_INDEX = Object.fromEntries(BASE_ORDER.map((rank, index) => [rank, index]));
+const NATURAL_RANK_INDEX = Object.fromEntries(BASE_ORDER.map((rank, index) => [rank, index]));
 const SCHIEBER_START_CARD_ID = 'rosen_7';
+const SEQUENCE_POINTS = {
+  3: 20,
+  4: 50,
+  5: 100,
+  6: 150,
+  7: 200,
+  8: 250,
+  9: 300,
+};
 
 export const BID_VALUES = [0, 60, 70, 80, 90, 100, 110, 120, 130, 140, 157];
 
@@ -64,10 +111,10 @@ export const GAME_VARIANTS = {
     modeLabel: 'Bieterjass',
     rules: [
       '36 Karten (6 bis Ass), 12 Karten pro Spieler, in 3er-Paketen verteilt.',
-      'Jeder bietet genau einmal. Das höchste Gebot spielt alleine gegen die anderen zwei.',
-      'Der Höchstbietende wählt die Trumpffarbe.',
+      'Jeder bietet genau einmal. Das hoechste Gebot spielt alleine gegen die anderen zwei.',
+      'Der Hoechstbietende waehlt die Trumpffarbe.',
       'Vereinfachte Bedienpflicht mit Trumpfstechen wie in der bisherigen Lokalversion.',
-      'Erfüllt der Bieter sein Gebot, erhält er den Gebotswert. Sonst verliert er ihn.',
+      'Erfuellt der Bieter sein Gebot, erhaelt er den Gebotswert. Sonst verliert er ihn.',
       'Ziel: zuerst 1500 Spielpunkte erreichen.',
     ],
   },
@@ -83,10 +130,10 @@ export const GAME_VARIANTS = {
     rules: [
       '36 Karten (6 bis Ass), 9 Karten pro Spieler, in 3er-Paketen verteilt.',
       'Es wird zu viert in festen Teams gespielt: du mit Partner gegen 2 Computer.',
-      'Wer die Rosen 7 hat, ist Vorhand, wählt Trumpf oder schiebt die Wahl einmal an den Partner weiter.',
-      'Bedienpflicht und Trumpfregeln sind als saubere Grundversion umgesetzt.',
-      'Keine Weis-, Stöck-, Obenabe- oder Undenufe-Regeln in dieser ersten Ausbaustufe.',
-      'Teamwertung: die Stichpunkte werden pro Runde addiert. Ziel: zuerst 1000 Punkte.',
+      'Vorhand waehlt Trumpf, Obe-Abe oder Une-Ufe oder schiebt die Wahl einmal an den Partner weiter.',
+      'Vor dem ersten Stich wird eine Weis-Phase gespielt. Nur das Team mit dem hoechsten Weis schreibt.',
+      'Zielscore ist 1000 oder 2500. Im 2500er-Spiel gelten Spielart-Multiplikatoren pro Runde.',
+      'Letzter Stich gibt in jeder Schieber-Runde 5 Zusatzpunkte.',
     ],
   },
 };
@@ -99,6 +146,58 @@ function getVariantOrThrow(variantId) {
   return variant;
 }
 
+export function isTrumpMode(roundMode) {
+  return SUITS.includes(roundMode);
+}
+
+export function isNoTrumpMode(roundMode) {
+  return roundMode === 'obeAbe' || roundMode === 'uneUfe';
+}
+
+export function getRoundModeLabel(roundMode) {
+  return ROUND_MODE_LABELS[roundMode] || '';
+}
+
+export function normalizeSchieberTargetScore(targetScore) {
+  return SCHIEBER_TARGET_SCORES.includes(targetScore) ? targetScore : 1000;
+}
+
+function normalizeMatchConfig(variantId, matchConfig = {}) {
+  if (variantId !== 'schieber') {
+    return {
+      targetScore: GAME_VARIANTS[variantId].targetScore,
+    };
+  }
+
+  return {
+    targetScore: normalizeSchieberTargetScore(matchConfig.targetScore),
+  };
+}
+
+export function getGameTargetScore(game) {
+  return game.matchConfig?.targetScore ?? game.variant.targetScore;
+}
+
+export function getRoundMultiplier(gameOrTargetScore, maybeRoundMode = null) {
+  const targetScore = typeof gameOrTargetScore === 'number'
+    ? normalizeSchieberTargetScore(gameOrTargetScore)
+    : getGameTargetScore(gameOrTargetScore);
+  const roundMode = typeof gameOrTargetScore === 'number'
+    ? maybeRoundMode
+    : gameOrTargetScore.roundMode;
+
+  if (targetScore !== 2500) {
+    return 1;
+  }
+  if (roundMode === 'obeAbe' || roundMode === 'uneUfe') {
+    return 3;
+  }
+  if (roundMode === 'schellen' || roundMode === 'schilten') {
+    return 2;
+  }
+  return 1;
+}
+
 export function cardImagePath(card) {
   return `assets/jasskarten_deck_png_sharper/${card.suit}_${card.rank}.png`;
 }
@@ -107,12 +206,21 @@ export function cardLabel(card) {
   return `${SUIT_LABELS[card.suit]} ${RANK_LABELS[card.rank]}`;
 }
 
-export function cardPoints(card, trumpSuit) {
-  return card.suit === trumpSuit ? TRUMP_POINTS[card.rank] : BASE_POINTS[card.rank];
+export function cardPoints(card, roundMode = null) {
+  if (roundMode === 'obeAbe') {
+    return OBE_ABE_POINTS[card.rank];
+  }
+  if (roundMode === 'uneUfe') {
+    return UNE_UFE_POINTS[card.rank];
+  }
+  return card.suit === roundMode ? TRUMP_POINTS[card.rank] : BASE_POINTS[card.rank];
 }
 
-export function rankIndex(card, trumpSuit) {
-  return card.suit === trumpSuit
+export function rankIndex(card, roundMode = null) {
+  if (roundMode === 'uneUfe') {
+    return UNE_UFE_ORDER.indexOf(card.rank);
+  }
+  return card.suit === roundMode
     ? TRUMP_ORDER.indexOf(card.rank)
     : BASE_ORDER.indexOf(card.rank);
 }
@@ -134,7 +242,7 @@ function shuffle(cards) {
   return deck;
 }
 
-export function sortPlayerHand(hand, trumpSuit) {
+export function sortPlayerHand(hand) {
   return [...hand].sort((first, second) => {
     if (first.suit !== second.suit) {
       return HAND_SUIT_INDEX[first.suit] - HAND_SUIT_INDEX[second.suit];
@@ -197,13 +305,14 @@ function createTeams(variantId, players) {
   ];
 }
 
-export function createGame({ variantId = 'bieter', playerName = 'Du' } = {}) {
+export function createGame({ variantId = 'bieter', playerName = 'Du', matchConfig = {} } = {}) {
   const variant = getVariantOrThrow(variantId);
   const players = createPlayers(variantId, playerName || 'Du');
 
   return {
     variantId,
     variant,
+    matchConfig: normalizeMatchConfig(variantId, matchConfig),
     players,
     teams: createTeams(variantId, players),
     phase: 'setup',
@@ -213,6 +322,7 @@ export function createGame({ variantId = 'bieter', playerName = 'Du' } = {}) {
     biddingIndex: 0,
     highestBid: 0,
     highestBidder: -1,
+    roundMode: null,
     trumpSuit: null,
     soloPlayer: -1,
     chooserPlayer: -1,
@@ -226,6 +336,9 @@ export function createGame({ variantId = 'bieter', playerName = 'Du' } = {}) {
     capturedPileOwners: { 0: 0, 1: 1 },
     firstCapturedTrick: null,
     lastCapturedPile: null,
+    teamWeisScores: { 0: 0, 1: 0 },
+    teamWeisBreakdown: { 0: [], 1: [] },
+    weisState: null,
     log: [],
     roundSummary: null,
     roundNumber: 0,
@@ -281,7 +394,8 @@ function resetRoundPlayerState(player) {
 }
 
 function roundHeader(game) {
-  return `Runde ${game.roundNumber} - ${game.variant.label} - Geber: ${game.players[game.dealer].name}`;
+  const targetInfo = isSchieber(game) ? ` - Ziel ${getGameTargetScore(game)}` : '';
+  return `Runde ${game.roundNumber} - ${game.variant.label}${targetInfo} - Geber: ${game.players[game.dealer].name}`;
 }
 
 function playerIndexWithCard(hands, cardId) {
@@ -297,6 +411,7 @@ export function startRound(game) {
   game.biddingIndex = 0;
   game.highestBid = 0;
   game.highestBidder = -1;
+  game.roundMode = null;
   game.trumpSuit = null;
   game.soloPlayer = -1;
   game.chooserPlayer = -1;
@@ -310,12 +425,15 @@ export function startRound(game) {
   game.capturedPileOwners = { 0: 0, 1: 1 };
   game.firstCapturedTrick = null;
   game.lastCapturedPile = null;
+  game.teamWeisScores = { 0: 0, 1: 0 };
+  game.teamWeisBreakdown = { 0: [], 1: [] };
+  game.weisState = null;
   game.roundSummary = null;
 
   const hands = dealHands(game.variant.playerCount, game.variant.dealPacketSize, game.dealer);
   game.players.forEach((player, playerIndex) => {
     resetRoundPlayerState(player);
-    player.hand = sortPlayerHand(hands[playerIndex], '');
+    player.hand = sortPlayerHand(hands[playerIndex]);
   });
 
   game.log = [roundHeader(game)];
@@ -338,7 +456,7 @@ export function startRound(game) {
   game.chooserPlayer = game.forehandPlayer;
   game.currentPlayer = game.forehandPlayer;
   game.phase = 'chooseTrump';
-  game.log.push(`${game.players[game.forehandPlayer].name} hat die Rosen 7, ist Vorhand und wählt Trumpf oder schiebt.`);
+  game.log.push(`${game.players[game.forehandPlayer].name} hat die Rosen 7, ist Vorhand und waehlt Spielart oder schiebt.`);
 }
 
 export function submitBid(game, playerIndex, bidValue) {
@@ -352,10 +470,10 @@ export function submitBid(game, playerIndex, bidValue) {
     throw new Error('Dieser Spieler ist nicht am Zug.');
   }
   if (!BID_VALUES.includes(bidValue)) {
-    throw new Error('Ungültiger Gebotswert.');
+    throw new Error('Ungueltiger Gebotswert.');
   }
   if (bidValue !== 0 && bidValue <= game.highestBid) {
-    throw new Error(`Gebot muss höher als ${game.highestBid} sein.`);
+    throw new Error(`Gebot muss hoeher als ${game.highestBid} sein.`);
   }
 
   const player = game.players[playerIndex];
@@ -403,55 +521,356 @@ export function canPushTrump(game) {
 
 export function pushTrumpChoice(game) {
   if (!canPushTrump(game)) {
-    throw new Error('Schieben ist aktuell nicht möglich.');
+    throw new Error('Schieben ist aktuell nicht moeglich.');
   }
 
   const partnerIndex = partnerOf(game, game.forehandPlayer);
   game.trumpWasPushed = true;
   game.chooserPlayer = partnerIndex;
   game.currentPlayer = partnerIndex;
-  game.log.push(`${game.players[game.forehandPlayer].name} schiebt. ${game.players[partnerIndex].name} wählt Trumpf.`);
+  game.log.push(`${game.players[game.forehandPlayer].name} schiebt. ${game.players[partnerIndex].name} waehlt die Spielart.`);
 }
 
-export function chooseTrump(game, suit) {
-  if (game.phase !== 'chooseTrump') {
-    throw new Error('Nicht in der Trumpfwahl.');
+function getAnnouncementOrder(game) {
+  const order = [];
+  let current = game.forehandPlayer;
+  while (order.length < game.players.length) {
+    order.push(current);
+    current = nextPlayerIndex(game, current);
   }
-  if (game.currentPlayer < 0 || game.currentPlayer >= game.players.length) {
-    throw new Error('Kein gültiger Spieler für die Trumpfwahl.');
+  return order;
+}
+
+function createSequenceWeis(cards, roundMode) {
+  const orderedCards = [...cards].sort((first, second) => NATURAL_RANK_INDEX[first.rank] - NATURAL_RANK_INDEX[second.rank]);
+  const lowRank = orderedCards[0].rank;
+  const highRank = orderedCards[orderedCards.length - 1].rank;
+  const points = SEQUENCE_POINTS[orderedCards.length];
+
+  return {
+    id: `sequence:${orderedCards[0].suit}:${lowRank}:${highRank}`,
+    type: 'sequence',
+    points,
+    suit: orderedCards[0].suit,
+    ranks: orderedCards.map((card) => card.rank),
+    cards: orderedCards.map((card) => card.id),
+    length: orderedCards.length,
+    lowRank,
+    highRank,
+    relevantRank: roundMode === 'uneUfe' ? lowRank : highRank,
+  };
+}
+
+function createFourOfKindWeis(cards) {
+  const rank = cards[0].rank;
+  const points = rank === 'under' ? 200 : rank === '9' ? 150 : 100;
+
+  return {
+    id: `fourOfKind:${rank}`,
+    type: 'fourOfKind',
+    points,
+    suit: null,
+    ranks: [rank, rank, rank, rank],
+    cards: cards.map((card) => card.id),
+    length: 4,
+    lowRank: rank,
+    highRank: rank,
+    relevantRank: rank,
+  };
+}
+
+export function compareWeis(first, second, roundMode) {
+  if (!first && !second) {
+    return 0;
   }
-  if (!SUITS.includes(suit)) {
-    throw new Error('Unbekannte Trumpffarbe.');
+  if (!first) {
+    return -1;
+  }
+  if (!second) {
+    return 1;
+  }
+  if (first.points !== second.points) {
+    return first.points > second.points ? 1 : -1;
+  }
+  if (first.type !== second.type) {
+    return first.type === 'sequence' ? 1 : -1;
   }
 
-  const chooserPlayer = game.players[game.currentPlayer];
-  game.trumpSuit = suit;
-  game.phase = 'playing';
-  game.trickLeader = isBieter(game) ? game.soloPlayer : game.forehandPlayer;
-  game.currentPlayer = game.trickLeader;
-
-  if (chooserPlayer.id === game.trickLeader) {
-    game.log.push(`${chooserPlayer.name} wählt ${SUIT_LABELS[suit]} als Trumpf und spielt aus.`);
-  } else {
-    game.log.push(`${chooserPlayer.name} wählt ${SUIT_LABELS[suit]} als Trumpf. ${game.players[game.trickLeader].name} spielt aus.`);
+  const firstRank = NATURAL_RANK_INDEX[first.relevantRank];
+  const secondRank = NATURAL_RANK_INDEX[second.relevantRank];
+  if (firstRank !== secondRank) {
+    if (roundMode === 'uneUfe') {
+      return firstRank < secondRank ? 1 : -1;
+    }
+    return firstRank > secondRank ? 1 : -1;
   }
 
-  game.players.forEach((player) => {
-    player.hand = sortPlayerHand(player.hand, suit);
+  const firstTrumpWise = isTrumpMode(roundMode) && first.type === 'sequence' && first.suit === roundMode;
+  const secondTrumpWise = isTrumpMode(roundMode) && second.type === 'sequence' && second.suit === roundMode;
+  if (firstTrumpWise !== secondTrumpWise) {
+    return firstTrumpWise ? 1 : -1;
+  }
+
+  return 0;
+}
+
+function sortWeisDescending(weisen, roundMode) {
+  return [...weisen].sort((first, second) => {
+    const comparison = compareWeis(second, first, roundMode);
+    if (comparison !== 0) {
+      return comparison;
+    }
+    return first.id.localeCompare(second.id);
   });
 }
 
-function highestTrumpCard(trickCards, trumpSuit) {
+export function describeWeis(weis) {
+  if (!weis) {
+    return 'Kein Weis';
+  }
+  if (weis.type === 'sequence') {
+    return `${weis.points}er Folge ${SUIT_LABELS[weis.suit]} ${RANK_LABELS[weis.lowRank]}-${RANK_LABELS[weis.highRank]}`;
+  }
+  return `${weis.points} fuer 4x ${RANK_LABELS[weis.relevantRank]}`;
+}
+
+export function detectWeis(hand, roundMode = null) {
+  const sequences = [];
+  const bySuit = Object.fromEntries(SUITS.map((suit) => [suit, []]));
+  hand.forEach((card) => {
+    bySuit[card.suit].push(card);
+  });
+
+  SUITS.forEach((suit) => {
+    const suitedCards = bySuit[suit]
+      .slice()
+      .sort((first, second) => NATURAL_RANK_INDEX[first.rank] - NATURAL_RANK_INDEX[second.rank]);
+    let run = [];
+
+    suitedCards.forEach((card, index) => {
+      if (run.length === 0) {
+        run.push(card);
+      } else {
+        const previous = suitedCards[index - 1];
+        if (NATURAL_RANK_INDEX[card.rank] === NATURAL_RANK_INDEX[previous.rank] + 1) {
+          run.push(card);
+        } else {
+          if (run.length >= 3) {
+            sequences.push(createSequenceWeis(run, roundMode));
+          }
+          run = [card];
+        }
+      }
+    });
+
+    if (run.length >= 3) {
+      sequences.push(createSequenceWeis(run, roundMode));
+    }
+  });
+
+  const byRank = Object.fromEntries(RANKS.map((rank) => [rank, []]));
+  hand.forEach((card) => {
+    byRank[card.rank].push(card);
+  });
+
+  const fourOfKinds = RANKS
+    .filter((rank) => byRank[rank].length === 4)
+    .map((rank) => createFourOfKindWeis(byRank[rank]));
+
+  return sortWeisDescending([...sequences, ...fourOfKinds], roundMode);
+}
+
+function highestWeis(weisen, roundMode) {
+  return sortWeisDescending(weisen, roundMode)[0] ?? null;
+}
+
+function formatModeChoice(mode, chooserName, leaderName, chooserStarts) {
+  if (isTrumpMode(mode)) {
+    return chooserStarts
+      ? `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]} als Trumpf und spielt aus.`
+      : `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]} als Trumpf. ${leaderName} spielt aus.`;
+  }
+
+  return chooserStarts
+    ? `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]} und spielt aus.`
+    : `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]}. ${leaderName} spielt aus.`;
+}
+
+function startWeisPhase(game) {
+  const order = getAnnouncementOrder(game);
+  const possibleByPlayer = {};
+  const highestByPlayer = {};
+
+  order.forEach((playerIndex) => {
+    const detected = detectWeis(game.players[playerIndex].hand, game.roundMode)
+      .map((weis) => ({ ...weis, playerIndex }));
+    possibleByPlayer[playerIndex] = detected;
+    highestByPlayer[playerIndex] = highestWeis(detected, game.roundMode);
+  });
+
+  game.weisState = {
+    order,
+    currentIndex: 0,
+    possibleByPlayer,
+    highestByPlayer,
+    declaredByPlayer: {},
+    declaredEntries: [],
+    winningDeclaration: null,
+    awardedTeamId: null,
+  };
+  game.phase = 'announceWeis';
+  game.currentPlayer = order[0];
+  game.log.push('Weisrunde beginnt.');
+}
+
+function finishWeisPhase(game) {
+  const declaredEntries = game.weisState.declaredEntries.filter((entry) => entry.weis);
+
+  if (declaredEntries.length === 0) {
+    game.log.push('Kein Team meldet einen gueltigen Weis.');
+    game.phase = 'playing';
+    game.currentPlayer = game.trickLeader;
+    return;
+  }
+
+  const bestEntry = declaredEntries.reduce((best, current) => {
+    if (!best) {
+      return current;
+    }
+    const comparison = compareWeis(current.weis, best.weis, game.roundMode);
+    if (comparison > 0) {
+      return current;
+    }
+    if (comparison < 0) {
+      return best;
+    }
+    return current.orderIndex < best.orderIndex ? current : best;
+  }, null);
+
+  const winningTeamId = game.players[bestEntry.playerIndex].teamId;
+  const awardedWeis = game.teams
+    .find((team) => team.id === winningTeamId)
+    .playerIds
+    .flatMap((playerIndex) => game.weisState.possibleByPlayer[playerIndex] || []);
+
+  const totalWeisPoints = awardedWeis.reduce((sum, weis) => sum + weis.points, 0);
+  game.teamWeisScores[winningTeamId] = totalWeisPoints;
+  game.teamWeisBreakdown[winningTeamId] = sortWeisDescending(awardedWeis, game.roundMode);
+  game.weisState.winningDeclaration = bestEntry;
+  game.weisState.awardedTeamId = winningTeamId;
+
+  declaredEntries.forEach((entry) => {
+    game.log.push(`${game.players[entry.playerIndex].name} meldet ${describeWeis(entry.weis)}.`);
+  });
+  Object.entries(game.weisState.declaredByPlayer)
+    .filter(([, weis]) => !weis)
+    .forEach(([playerIndex]) => {
+      game.log.push(`${game.players[Number(playerIndex)].name} meldet keinen Weis.`);
+    });
+
+  const teamName = game.teams.find((team) => team.id === winningTeamId)?.name || 'Das Team';
+  game.log.push(`${teamName} schreibt ${totalWeisPoints} Weispunkte mit ${describeWeis(bestEntry.weis)}.`);
+  game.teamWeisBreakdown[winningTeamId].forEach((weis) => {
+    game.log.push(`  ${game.players[weis.playerIndex].name}: ${describeWeis(weis)}`);
+  });
+
+  game.phase = 'playing';
+  game.currentPlayer = game.trickLeader;
+}
+
+export function getPossibleWeisForPlayer(game, playerIndex) {
+  return game.weisState?.possibleByPlayer?.[playerIndex] || [];
+}
+
+export function submitWeisDeclaration(game, playerIndex, selectedWeisId = null) {
+  if (game.phase !== 'announceWeis') {
+    throw new Error('Nicht in der Weisrunde.');
+  }
+  if (playerIndex !== game.currentPlayer) {
+    throw new Error('Dieser Spieler ist nicht am Zug.');
+  }
+
+  const available = getPossibleWeisForPlayer(game, playerIndex);
+  let selectedWeis = null;
+
+  if (selectedWeisId) {
+    selectedWeis = available.find((weis) => weis.id === selectedWeisId) || null;
+    if (!selectedWeis) {
+      throw new Error('Dieser Weis ist fuer den Spieler nicht gueltig.');
+    }
+  } else {
+    selectedWeis = game.weisState.highestByPlayer[playerIndex] || null;
+  }
+
+  game.weisState.declaredByPlayer[playerIndex] = selectedWeis;
+  game.weisState.declaredEntries.push({
+    playerIndex,
+    weis: selectedWeis,
+    orderIndex: game.weisState.currentIndex,
+  });
+
+  game.weisState.currentIndex += 1;
+  if (game.weisState.currentIndex >= game.weisState.order.length) {
+    finishWeisPhase(game);
+    return;
+  }
+
+  game.currentPlayer = game.weisState.order[game.weisState.currentIndex];
+}
+
+export function chooseTrump(game, roundMode) {
+  if (game.phase !== 'chooseTrump') {
+    throw new Error('Nicht in der Spielartwahl.');
+  }
+  if (game.currentPlayer < 0 || game.currentPlayer >= game.players.length) {
+    throw new Error('Kein gueltiger Spieler fuer die Spielartwahl.');
+  }
+
+  const allowedModes = isSchieber(game) ? ROUND_MODE_OPTIONS : SUITS;
+  if (!allowedModes.includes(roundMode)) {
+    throw new Error('Unbekannte Spielart.');
+  }
+
+  const chooserPlayer = game.players[game.currentPlayer];
+  game.roundMode = roundMode;
+  game.trumpSuit = isTrumpMode(roundMode) ? roundMode : null;
+  game.trickLeader = isBieter(game) ? game.soloPlayer : game.forehandPlayer;
+
+  game.players.forEach((player) => {
+    player.hand = sortPlayerHand(player.hand);
+  });
+
+  game.log.push(formatModeChoice(
+    roundMode,
+    chooserPlayer.name,
+    game.players[game.trickLeader].name,
+    chooserPlayer.id === game.trickLeader
+  ));
+
+  if (isSchieber(game)) {
+    startWeisPhase(game);
+    return;
+  }
+
+  game.phase = 'playing';
+  game.currentPlayer = game.trickLeader;
+}
+
+function highestTrumpCard(trickCards, roundMode) {
+  if (!isTrumpMode(roundMode)) {
+    return null;
+  }
+
   const trumps = trickCards
     .map((entry) => entry.card)
-    .filter((card) => card.suit === trumpSuit);
+    .filter((card) => card.suit === roundMode);
 
   if (trumps.length === 0) {
     return null;
   }
 
   return trumps.reduce((best, current) =>
-    rankIndex(current, trumpSuit) > rankIndex(best, trumpSuit) ? current : best
+    rankIndex(current, roundMode) > rankIndex(best, roundMode) ? current : best
   );
 }
 
@@ -466,7 +885,7 @@ function uniqueCards(cards) {
   });
 }
 
-function getBieterPlayableCards(hand, ledSuit, trumpSuit) {
+function getBieterPlayableCards(hand, ledSuit, roundMode) {
   if (!ledSuit) {
     return [...hand];
   }
@@ -476,6 +895,7 @@ function getBieterPlayableCards(hand, ledSuit, trumpSuit) {
     return suited;
   }
 
+  const trumpSuit = isTrumpMode(roundMode) ? roundMode : null;
   const trumps = hand.filter((card) => card.suit === trumpSuit);
   if (trumps.length === 0) {
     return [...hand];
@@ -489,16 +909,26 @@ function getBieterPlayableCards(hand, ledSuit, trumpSuit) {
   return trumps;
 }
 
-function getSchieberPlayableCards(hand, trickCards, trumpSuit) {
+function getNoTrumpPlayableCards(hand, trickCards) {
   const ledSuit = trickCards.length > 0 ? trickCards[0].card.suit : null;
   if (!ledSuit) {
     return [...hand];
   }
 
   const suited = hand.filter((card) => card.suit === ledSuit);
-  const trumps = hand.filter((card) => card.suit === trumpSuit);
+  return suited.length > 0 ? suited : [...hand];
+}
 
-  if (ledSuit === trumpSuit) {
+function getSchieberTrumpPlayableCards(hand, trickCards, roundMode) {
+  const ledSuit = trickCards.length > 0 ? trickCards[0].card.suit : null;
+  if (!ledSuit) {
+    return [...hand];
+  }
+
+  const suited = hand.filter((card) => card.suit === ledSuit);
+  const trumps = hand.filter((card) => card.suit === roundMode);
+
+  if (ledSuit === roundMode) {
     if (trumps.length === 0) {
       return [...hand];
     }
@@ -508,12 +938,12 @@ function getSchieberPlayableCards(hand, trickCards, trumpSuit) {
     return trumps;
   }
 
-  const highestTrump = highestTrumpCard(trickCards, trumpSuit);
+  const highestTrump = highestTrumpCard(trickCards, roundMode);
   const higherTrumps = highestTrump
-    ? trumps.filter((card) => rankIndex(card, trumpSuit) > rankIndex(highestTrump, trumpSuit))
+    ? trumps.filter((card) => rankIndex(card, roundMode) > rankIndex(highestTrump, roundMode))
     : trumps;
 
-  const nonTrumps = hand.filter((card) => card.suit !== trumpSuit);
+  const nonTrumps = hand.filter((card) => card.suit !== roundMode);
   const onlyTrumpsInHand = trumps.length === hand.length;
   const onlyPuurTrump = trumps.length === 1 && trumps[0].rank === 'under';
 
@@ -538,22 +968,26 @@ function getSchieberPlayableCards(hand, trickCards, trumpSuit) {
   return uniqueCards(legal);
 }
 
-export function getPlayableCards(hand, trickCards, trumpSuit, variantId = 'bieter') {
-  return variantId === 'schieber'
-    ? getSchieberPlayableCards(hand, trickCards, trumpSuit)
-    : getBieterPlayableCards(hand, trickCards.length > 0 ? trickCards[0].card.suit : null, trumpSuit);
+export function getPlayableCards(hand, trickCards, roundMode, variantId = 'bieter') {
+  if (variantId === 'schieber') {
+    return isNoTrumpMode(roundMode)
+      ? getNoTrumpPlayableCards(hand, trickCards)
+      : getSchieberTrumpPlayableCards(hand, trickCards, roundMode);
+  }
+
+  return getBieterPlayableCards(hand, trickCards.length > 0 ? trickCards[0].card.suit : null, roundMode);
 }
 
 export function getPlayableCardsForPlayer(game, playerIndex) {
   return getPlayableCards(
     game.players[playerIndex].hand,
     game.trick,
-    game.trumpSuit,
+    game.roundMode,
     game.variantId
   );
 }
 
-export function trickWinner(trickCards, trumpSuit) {
+export function trickWinner(trickCards, roundMode) {
   const ledSuit = trickCards[0].card.suit;
   let best = trickCards[0];
 
@@ -561,31 +995,30 @@ export function trickWinner(trickCards, trumpSuit) {
     const entry = trickCards[index];
     const current = entry.card;
     const bestCard = best.card;
-    const currentTrump = current.suit === trumpSuit;
-    const bestTrump = bestCard.suit === trumpSuit;
 
-    if (currentTrump && !bestTrump) {
-      best = entry;
-      continue;
-    }
-    if (!currentTrump && bestTrump) {
-      continue;
-    }
-    if (currentTrump && bestTrump) {
-      if (rankIndex(current, trumpSuit) > rankIndex(bestCard, trumpSuit)) {
+    if (isTrumpMode(roundMode)) {
+      const currentTrump = current.suit === roundMode;
+      const bestTrump = bestCard.suit === roundMode;
+
+      if (currentTrump && !bestTrump) {
         best = entry;
+        continue;
       }
+      if (!currentTrump && bestTrump) {
+        continue;
+      }
+      if (currentTrump && bestTrump) {
+        if (rankIndex(current, roundMode) > rankIndex(bestCard, roundMode)) {
+          best = entry;
+        }
+        continue;
+      }
+    }
+
+    if (current.suit !== ledSuit) {
       continue;
     }
-    if (current.suit === ledSuit && bestCard.suit !== ledSuit) {
-      best = entry;
-      continue;
-    }
-    if (
-      current.suit === ledSuit
-      && bestCard.suit === ledSuit
-      && rankIndex(current, trumpSuit) > rankIndex(bestCard, trumpSuit)
-    ) {
+    if (bestCard.suit !== ledSuit || rankIndex(current, roundMode) > rankIndex(bestCard, roundMode)) {
       best = entry;
     }
   }
@@ -593,8 +1026,8 @@ export function trickWinner(trickCards, trumpSuit) {
   return best.playerIndex;
 }
 
-export function trickPoints(trickCards, trumpSuit) {
-  return trickCards.reduce((sum, entry) => sum + cardPoints(entry.card, trumpSuit), 0);
+export function trickPoints(trickCards, roundMode) {
+  return trickCards.reduce((sum, entry) => sum + cardPoints(entry.card, roundMode), 0);
 }
 
 export function pileIdForWinner(game, winningPlayer) {
@@ -635,7 +1068,7 @@ export function playCard(game, playerIndex, cardId) {
   return false;
 }
 
-function teamRoundPoints(game, teamId) {
+function teamTrickPoints(game, teamId) {
   return game.players
     .filter((player) => player.teamId === teamId)
     .reduce((sum, player) => sum + player.pointsWon, 0);
@@ -647,11 +1080,23 @@ function teamTricksWon(game, teamId) {
     .reduce((sum, player) => sum + player.tricksWon, 0);
 }
 
+export function getTeamWeisPoints(game, teamId) {
+  return game.teamWeisScores?.[teamId] ?? 0;
+}
+
+export function getSchieberTeamBasePoints(game, teamId) {
+  return teamTrickPoints(game, teamId) + getTeamWeisPoints(game, teamId);
+}
+
+export function getSchieberTeamRoundPoints(game, teamId) {
+  return getSchieberTeamBasePoints(game, teamId) * getRoundMultiplier(game);
+}
+
 export function resolveTrick(game) {
-  const winningPlayer = trickWinner(game.trick, game.trumpSuit);
+  const winningPlayer = trickWinner(game.trick, game.roundMode);
   const pileId = pileIdForWinner(game, winningPlayer);
   const isLastTrick = game.trickNumber === game.variant.handSize - 1;
-  let points = trickPoints(game.trick, game.trumpSuit);
+  let points = trickPoints(game.trick, game.roundMode);
 
   if (isLastTrick) {
     points += 5;
@@ -724,7 +1169,7 @@ function resolveBieterRound(game) {
   };
 
   if (succeeded) {
-    game.log.push(`${soloPlayer.name} erfüllt ${bid} und erhält ${soloGain} Spielpunkte.`);
+    game.log.push(`${soloPlayer.name} erfuellt ${bid} und erhaelt ${soloGain} Spielpunkte.`);
   } else {
     game.log.push(`${soloPlayer.name} scheitert mit ${soloPoints}/${bid} Punkten.`);
     if (defenderGain > 0) {
@@ -736,21 +1181,56 @@ function resolveBieterRound(game) {
   game.phase = winner ? 'gameOver' : 'roundEnd';
 }
 
-function resolveSchieberRound(game) {
-  const results = game.teams.map((team) => ({
-    teamId: team.id,
-    name: team.name,
-    roundPoints: teamRoundPoints(game, team.id),
-    tricksWon: teamTricksWon(game, team.id),
-  }));
+function compareRoundResults(first, second) {
+  if (first.roundPoints !== second.roundPoints) {
+    return second.roundPoints - first.roundPoints;
+  }
+  if (first.basePoints !== second.basePoints) {
+    return second.basePoints - first.basePoints;
+  }
+  if (first.tricksWon !== second.tricksWon) {
+    return second.tricksWon - first.tricksWon;
+  }
+  return first.teamId - second.teamId;
+}
 
+function compareTeamsByTotal(first, second, resultByTeamId) {
+  if (first.totalScore !== second.totalScore) {
+    return second.totalScore - first.totalScore;
+  }
+  const firstResult = resultByTeamId[first.id];
+  const secondResult = resultByTeamId[second.id];
+  return compareRoundResults(firstResult, secondResult);
+}
+
+function resolveSchieberRound(game) {
+  const multiplier = getRoundMultiplier(game);
+  const results = game.teams.map((team) => {
+    const trickPointsWon = teamTrickPoints(game, team.id);
+    const weisPointsWon = getTeamWeisPoints(game, team.id);
+    const basePoints = trickPointsWon + weisPointsWon;
+
+    return {
+      teamId: team.id,
+      name: team.name,
+      trickPoints: trickPointsWon,
+      weisPoints: weisPointsWon,
+      basePoints,
+      roundPoints: basePoints * multiplier,
+      tricksWon: teamTricksWon(game, team.id),
+    };
+  });
+
+  const resultByTeamId = Object.fromEntries(results.map((result) => [result.teamId, result]));
   results.forEach((result) => {
     const team = game.teams.find((entry) => entry.id === result.teamId);
     team.totalScore += result.roundPoints;
   });
 
-  const winningTeam = [...game.teams].sort((first, second) => second.totalScore - first.totalScore)[0];
-  const roundWinner = [...results].sort((first, second) => second.roundPoints - first.roundPoints)[0];
+  const rankedTeams = [...game.teams].sort((first, second) => compareTeamsByTotal(first, second, resultByTeamId));
+  const winningTeam = rankedTeams[0];
+  const roundWinner = [...results].sort(compareRoundResults)[0];
+  const targetScore = getGameTargetScore(game);
 
   game.roundSummary = {
     type: 'schieber',
@@ -758,12 +1238,20 @@ function resolveSchieberRound(game) {
     roundWinnerTeamId: roundWinner.teamId,
     trumpChooser: game.chooserPlayer,
     pushed: game.trumpWasPushed,
+    roundMode: game.roundMode,
+    multiplier,
+    targetScore,
+    weisWinnerTeamId: game.weisState?.awardedTeamId ?? null,
+    highestWeis: game.weisState?.winningDeclaration?.weis ?? null,
   };
 
-  game.log.push(`${results[0].name}: ${results[0].roundPoints} Punkte.`);
-  game.log.push(`${results[1].name}: ${results[1].roundPoints} Punkte.`);
+  results.forEach((result) => {
+    const multiplierInfo = multiplier > 1 ? ` x${multiplier}` : '';
+    const weisInfo = result.weisPoints > 0 ? ` + ${result.weisPoints} Weis` : '';
+    game.log.push(`${result.name}: ${result.trickPoints}${weisInfo} = ${result.basePoints}${multiplierInfo} -> ${result.roundPoints} Punkte.`);
+  });
 
-  game.phase = winningTeam.totalScore >= game.variant.targetScore ? 'gameOver' : 'roundEnd';
+  game.phase = winningTeam.totalScore >= targetScore ? 'gameOver' : 'roundEnd';
 }
 
 function resolveRound(game) {
@@ -774,13 +1262,28 @@ function resolveRound(game) {
   resolveSchieberRound(game);
 }
 
-export function handValue(hand, trumpSuit) {
-  return hand.reduce((sum, card) => sum + cardPoints(card, trumpSuit), 0);
+export function handValue(hand, roundMode) {
+  return hand.reduce((sum, card) => sum + cardPoints(card, roundMode), 0);
+}
+
+function estimateSchieberModeValue(hand, roundMode, targetScore = 1000) {
+  const rawHandValue = handValue(hand, roundMode);
+  const possibleWeis = detectWeis(hand, roundMode);
+  const bestOwnWeis = highestWeis(possibleWeis, roundMode);
+  return (rawHandValue + (bestOwnWeis?.points ?? 0)) * getRoundMultiplier(targetScore, roundMode);
 }
 
 export function bestTrumpSuit(hand) {
   return SUITS.reduce((bestSuit, suit) =>
     handValue(hand, suit) > handValue(hand, bestSuit) ? suit : bestSuit
+  );
+}
+
+export function bestSchieberMode(hand, targetScore = 1000) {
+  return ROUND_MODE_OPTIONS.reduce((bestMode, currentMode) =>
+    estimateSchieberModeValue(hand, currentMode, targetScore) > estimateSchieberModeValue(hand, bestMode, targetScore)
+      ? currentMode
+      : bestMode
   );
 }
 
@@ -796,25 +1299,26 @@ export function aiBidDecision(hand, currentHighestBid) {
 
 function wouldWin(game, playerIndex, card) {
   const simulated = [...game.trick, { playerIndex, card }];
-  return trickWinner(simulated, game.trumpSuit) === playerIndex;
+  return trickWinner(simulated, game.roundMode) === playerIndex;
 }
 
 export function aiChooseCard(game, playerIndex) {
-  const player = game.players[playerIndex];
   const legalCards = getPlayableCardsForPlayer(game, playerIndex);
-  const byPointsAscending = (first, second) => cardPoints(first, game.trumpSuit) - cardPoints(second, game.trumpSuit);
-  const byPointsDescending = (first, second) => cardPoints(second, game.trumpSuit) - cardPoints(first, game.trumpSuit);
-  const byRankDescending = (first, second) => rankIndex(second, game.trumpSuit) - rankIndex(first, game.trumpSuit);
+  const byPointsAscending = (first, second) => cardPoints(first, game.roundMode) - cardPoints(second, game.roundMode);
+  const byPointsDescending = (first, second) => cardPoints(second, game.roundMode) - cardPoints(first, game.roundMode);
+  const byRankDescending = (first, second) => rankIndex(second, game.roundMode) - rankIndex(first, game.roundMode);
 
   if (game.trick.length === 0) {
-    const trumpCards = legalCards.filter((card) => card.suit === game.trumpSuit);
+    const trumpCards = isTrumpMode(game.roundMode)
+      ? legalCards.filter((card) => card.suit === game.roundMode)
+      : [];
     if (trumpCards.length >= 2) {
       return [...trumpCards].sort(byRankDescending)[0];
     }
     return [...legalCards].sort(byRankDescending)[0];
   }
 
-  const currentWinner = trickWinner(game.trick, game.trumpSuit);
+  const currentWinner = trickWinner(game.trick, game.roundMode);
   const teammateWinning = sameSide(game, currentWinner, playerIndex);
   const winningCards = legalCards.filter((card) => wouldWin(game, playerIndex, card));
 

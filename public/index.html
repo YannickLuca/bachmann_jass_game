@@ -21,7 +21,7 @@
       <h1 class="setup-title">Jass</h1>
       <p id="setup-sub" class="setup-sub">3 Spieler - du spielst alleine gegen 2 Computer</p>
 
-      <div class="variant-picker" aria-label="Jassart wählen">
+      <div class="variant-picker" aria-label="Jassart waehlen">
         <button type="button" class="variant-card active" data-variant="bieter" aria-pressed="true">
           <span class="variant-title">Bieterjass</span>
           <span class="variant-copy">3 Spieler, Gebot, Solo gegen 2</span>
@@ -35,6 +35,15 @@
       <div class="setup-form">
         <label for="player-name">Dein Name</label>
         <input id="player-name" type="text" value="Nadinka" maxlength="18" />
+
+        <div id="setup-target-section" class="setup-target-section hidden">
+          <div class="setup-target-head">
+            <span class="setup-target-label">Punkteziel im Schieber</span>
+            <span id="setup-target-hint" class="setup-target-hint"></span>
+          </div>
+          <div id="setup-target-options" class="target-picker" aria-label="Punkteziel waehlen"></div>
+        </div>
+
         <button id="btn-start" class="btn btn-primary">Spiel starten</button>
       </div>
 
@@ -61,17 +70,23 @@
 
     <main id="table-area" class="table-area mode-bieter">
       <section id="zone-left" class="player-zone zone-left hidden">
-        <div class="player-label">
-          <span id="pname-left"></span>
-          <span id="badge-left" class="player-badge"></span>
+        <div class="zone-head">
+          <div id="pile-anchor-left" class="zone-pile-anchor"></div>
+          <div class="player-label">
+            <span id="pname-left"></span>
+            <span id="badge-left" class="player-badge"></span>
+          </div>
         </div>
         <div id="hand-left" class="hand hand-ai hand-side"></div>
       </section>
 
       <section id="zone-top" class="player-zone zone-top hidden">
-        <div class="player-label">
-          <span id="pname-top"></span>
-          <span id="badge-top" class="player-badge"></span>
+        <div class="zone-head">
+          <div id="pile-anchor-top" class="zone-pile-anchor"></div>
+          <div class="player-label">
+            <span id="pname-top"></span>
+            <span id="badge-top" class="player-badge"></span>
+          </div>
         </div>
         <div id="hand-top" class="hand hand-ai hand-top"></div>
       </section>
@@ -79,6 +94,7 @@
       <section class="center-zone">
         <div class="status-row">
           <div id="trump-display" class="trump-display hidden"></div>
+          <div id="target-display" class="target-display hidden"></div>
           <div id="message" class="message"></div>
         </div>
 
@@ -111,17 +127,25 @@
           </div>
 
           <div id="trump-controls" class="control-box hidden">
-            <span id="trump-prompt" class="ctrl-label">Trumpf wählen:</span>
-            <button class="trump-btn btn" type="button" data-suit="eicheln"></button>
-            <button class="trump-btn btn" type="button" data-suit="rosen"></button>
-            <button class="trump-btn btn" type="button" data-suit="schellen"></button>
-            <button class="trump-btn btn" type="button" data-suit="schilten"></button>
+            <span id="trump-prompt" class="ctrl-label">Spielart waehlen:</span>
+            <button class="trump-btn btn" type="button" data-mode="eicheln"></button>
+            <button class="trump-btn btn" type="button" data-mode="rosen"></button>
+            <button class="trump-btn btn" type="button" data-mode="schellen"></button>
+            <button class="trump-btn btn" type="button" data-mode="schilten"></button>
+            <button class="trump-btn btn" type="button" data-mode="obeAbe"></button>
+            <button class="trump-btn btn" type="button" data-mode="uneUfe"></button>
             <button id="btn-push" class="btn btn-secondary hidden" type="button">Schieben</button>
+          </div>
+
+          <div id="weis-controls" class="control-box control-box-weis hidden">
+            <div id="weis-prompt" class="ctrl-label"></div>
+            <div id="weis-list" class="weis-list"></div>
+            <button id="btn-weis" class="btn btn-accent" type="button">Weis bestaetigen</button>
           </div>
 
           <div id="round-end-controls" class="control-box hidden">
             <div id="round-end-msg" class="summary-msg"></div>
-            <button id="btn-next-round" class="btn btn-primary" type="button">Nächste Runde</button>
+            <button id="btn-next-round" class="btn btn-primary" type="button">Naechste Runde</button>
           </div>
 
           <div id="game-over-controls" class="control-box hidden">
@@ -132,17 +156,22 @@
       </section>
 
       <section id="zone-right" class="player-zone zone-right hidden">
-        <div class="player-label">
-          <span id="pname-right"></span>
-          <span id="badge-right" class="player-badge"></span>
+        <div class="zone-head">
+          <div id="pile-anchor-right" class="zone-pile-anchor"></div>
+          <div class="player-label">
+            <span id="pname-right"></span>
+            <span id="badge-right" class="player-badge"></span>
+          </div>
         </div>
         <div id="hand-right" class="hand hand-ai hand-side hand-right"></div>
       </section>
 
       <section id="zone-bottom" class="player-zone zone-bottom hidden">
-        <div class="player-label">
-          <span id="pname-bottom"></span>
-          <span id="badge-bottom" class="player-badge"></span>
+        <div class="zone-head zone-head-bottom">
+          <div class="player-label">
+            <span id="pname-bottom"></span>
+            <span id="badge-bottom" class="player-badge"></span>
+          </div>
         </div>
         <div id="hand-bottom" class="hand hand-human"></div>
       </section>

@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "deploy": "node scripts/build-gh-pages.mjs"
+    "deploy": "node scripts/build-gh-pages.mjs",
+    "test:browser": "powershell -ExecutionPolicy Bypass -File scripts/run-browser-tests.ps1"
   },
   "dependencies": {
     "express": "^4.19.2"

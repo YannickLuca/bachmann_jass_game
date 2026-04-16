@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bachmann-jass-v5';
+const CACHE_NAME = 'bachmann-jass-v6';
 const CORE_ASSETS = [
   './',
   './index.html',

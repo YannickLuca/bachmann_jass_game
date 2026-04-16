@@ -1,8 +1,10 @@
 import {
   BID_VALUES,
   GAME_VARIANTS,
+  ROUND_MODE_LABELS,
+  ROUND_MODE_OPTIONS,
+  SCHIEBER_TARGET_SCORES,
   SUITS,
-  SUIT_LABELS,
   cardImagePath,
   cardLabel,
   createGame,
@@ -17,11 +19,22 @@ import {
   getPlayableCardsForPlayer,
   aiBidDecision,
   bestTrumpSuit,
+  bestSchieberMode,
   handValue,
   aiChooseCard,
   getDisplayScore,
+  getGameTargetScore,
+  getRoundMultiplier,
+  getRoundModeLabel,
+  getSchieberTeamBasePoints,
+  getSchieberTeamRoundPoints,
+  getTeamWeisPoints,
+  getPossibleWeisForPlayer,
+  submitWeisDeclaration,
+  describeWeis,
   isBieter,
   isSchieber,
+  isTrumpMode,
   pileIdForWinner,
 } from './game-engine.js';
 
@@ -33,11 +46,13 @@ const PLAYER_POSITIONS = {
 const AI_DELAYS = {
   bidding: [1200, 2100],
   trump: [1500, 2600],
+  weis: [900, 1700],
   card: [1500, 2700],
   trickEnd: [1700, 2500],
 };
 
 let selectedVariantId = 'bieter';
+let selectedSchieberTargetScore = 1000;
 let game = null;
 let aiLocked = false;
 let animatedTrickCards = new Set();
@@ -46,12 +61,16 @@ const screenSetup = document.getElementById('screen-setup');
 const screenGame = document.getElementById('screen-game');
 const setupSub = document.getElementById('setup-sub');
 const setupRulesList = document.getElementById('setup-rules-list');
+const setupTargetSection = document.getElementById('setup-target-section');
+const setupTargetOptions = document.getElementById('setup-target-options');
+const setupTargetHint = document.getElementById('setup-target-hint');
 const variantCards = [...document.querySelectorAll('.variant-card')];
 const playerNameInput = document.getElementById('player-name');
 const btnStart = document.getElementById('btn-start');
 const scorePanel = document.getElementById('score-panel');
 const msgEl = document.getElementById('message');
 const trumpDisplay = document.getElementById('trump-display');
+const targetDisplay = document.getElementById('target-display');
 const logEl = document.getElementById('log-messages');
 const gameModeLabel = document.getElementById('game-mode-label');
 const tableArea = document.getElementById('table-area');
@@ -63,6 +82,10 @@ const btnBid = document.getElementById('btn-bid');
 const trumpControls = document.getElementById('trump-controls');
 const trumpPrompt = document.getElementById('trump-prompt');
 const btnPush = document.getElementById('btn-push');
+const weisControls = document.getElementById('weis-controls');
+const weisPrompt = document.getElementById('weis-prompt');
+const weisList = document.getElementById('weis-list');
+const btnWeis = document.getElementById('btn-weis');
 const roundEndControls = document.getElementById('round-end-controls');
 const roundEndMsg = document.getElementById('round-end-msg');
 const btnNextRound = document.getElementById('btn-next-round');
@@ -87,6 +110,11 @@ const nameEls = Object.fromEntries(
 const badgeEls = Object.fromEntries(
   ZONE_POSITIONS.map((position) => [position, document.getElementById(`badge-${position}`)])
 );
+const pileAnchorEls = {
+  left: document.getElementById('pile-anchor-left'),
+  top: document.getElementById('pile-anchor-top'),
+  right: document.getElementById('pile-anchor-right'),
+};
 const trickSlots = Object.fromEntries(
   ZONE_POSITIONS.map((position) => [position, document.getElementById(`trick-slot-${position}`)])
 );
@@ -116,7 +144,7 @@ function playerIndexForPosition(position) {
 }
 
 function isInteractivePhase() {
-  return ['bidding', 'chooseTrump', 'playing'].includes(game.phase);
+  return ['bidding', 'chooseTrump', 'announceWeis', 'playing'].includes(game.phase);
 }
 
 function getPlayerBadge(playerIndex) {
@@ -206,12 +234,6 @@ function pileLabel(pileId) {
   return pileId === 0 ? 'Bieter' : 'Gegner';
 }
 
-function teamRoundPoints(teamId) {
-  return game.players
-    .filter((player) => player.teamId === teamId)
-    .reduce((sum, player) => sum + player.pointsWon, 0);
-}
-
 function teamRoundTricks(teamId) {
   return game.players
     .filter((player) => player.teamId === teamId)
@@ -264,20 +286,15 @@ function placeCapturedPiles() {
   pileEls.forEach((pile, pileId) => {
     const ownerIndex = pileOwnerIndex(pileId);
     const ownerPosition = pileOwnerPosition(pileId);
-    const zone = zoneEls[ownerPosition];
-    const hand = handEls[ownerPosition];
+    const anchor = pileAnchorEls[ownerPosition];
 
     pile.root.classList.add('pile-in-player-zone');
     pile.root.dataset.pileId = String(pileId);
     pile.root.dataset.ownerPosition = ownerPosition;
     pile.root.dataset.ownerPlayer = String(ownerIndex);
 
-    if (zone && hand) {
-      if (pileId === 0) {
-        zone.appendChild(pile.root);
-      } else {
-        zone.insertBefore(pile.root, hand);
-      }
+    if (anchor) {
+      anchor.appendChild(pile.root);
     }
   });
 }
@@ -325,6 +342,37 @@ function openFirstTrickReview(pileId) {
   trickReview.classList.remove('hidden');
 }
 
+function renderSetupTargetOptions() {
+  if (selectedVariantId !== 'schieber') {
+    setupTargetSection.classList.add('hidden');
+    return;
+  }
+
+  setupTargetSection.classList.remove('hidden');
+  setupTargetOptions.innerHTML = SCHIEBER_TARGET_SCORES.map((score) => {
+    const active = selectedSchieberTargetScore === score;
+    const copy = score === 1000
+      ? 'Alle Spielarten zaehlen einfach.'
+      : 'Rosen/Eicheln x1, Schilten/Schellen x2, Obe-Abe/Une-Ufe x3.';
+
+    return `
+      <button
+        type="button"
+        class="target-card${active ? ' active' : ''}"
+        data-target-score="${score}"
+        aria-pressed="${active ? 'true' : 'false'}"
+      >
+        <span class="target-title">${score} Punkte</span>
+        <span class="target-copy">${escapeHtml(copy)}</span>
+      </button>
+    `;
+  }).join('');
+
+  setupTargetHint.textContent = selectedSchieberTargetScore === 2500
+    ? '2500er-Partie mit Multiplikatoren pro Spielart.'
+    : '1000er-Partie ohne Spielart-Multiplikatoren.';
+}
+
 function setSetupVariant(variantId) {
   selectedVariantId = variantId;
   const variant = getSelectedVariant();
@@ -336,9 +384,17 @@ function setSetupVariant(variantId) {
   });
 
   setupSub.textContent = variant.setupSubtitle;
-  setupRulesList.innerHTML = variant.rules
+  const rules = [...variant.rules];
+  if (variantId === 'schieber') {
+    rules.push(selectedSchieberTargetScore === 2500
+      ? 'Aktuelle Setup-Wahl: 2500 Punkte mit Runden-Multiplikatoren.'
+      : 'Aktuelle Setup-Wahl: 1000 Punkte, alle Spielarten einfach.');
+  }
+  setupRulesList.innerHTML = rules
     .map((rule) => `<li>${escapeHtml(rule)}</li>`)
     .join('');
+
+  renderSetupTargetOptions();
 }
 
 function applyVariantClasses() {
@@ -353,18 +409,23 @@ function applyVariantClasses() {
 function renderScorePanel() {
   if (isSchieber(game)) {
     const currentTeamId = game.players[game.currentPlayer]?.teamId;
+    const targetScore = getGameTargetScore(game);
+    const multiplier = getRoundMultiplier(game);
     scorePanel.innerHTML = game.teams.map((team) => {
-      const roundPoints = teamRoundPoints(team.id);
+      const roundPoints = getSchieberTeamRoundPoints(game, team.id);
+      const basePoints = getSchieberTeamBasePoints(game, team.id);
+      const weisPoints = getTeamWeisPoints(game, team.id);
       const tricks = teamRoundTricks(team.id);
       const active = team.id === currentTeamId && isInteractivePhase();
       const allied = team.id === game.players[0].teamId;
+      const multiplierText = multiplier > 1 && game.roundMode ? ` x${multiplier}` : '';
 
       return `
         <div class="score-card score-team${active ? ' active' : ''}${allied ? ' allied' : ''}">
           <div class="score-name">${escapeHtml(team.name)}</div>
           <div class="score-total">${roundPoints}</div>
-          <div class="score-sub">Runde | Gesamt ${team.totalScore}/${game.variant.targetScore}</div>
-          <div class="score-stats">${tricks} ${tricks === 1 ? 'Stich' : 'Stiche'} im Team</div>
+          <div class="score-sub">Runde ${basePoints}${multiplierText} | Gesamt ${team.totalScore}/${targetScore}</div>
+          <div class="score-stats">${tricks} ${tricks === 1 ? 'Stich' : 'Stiche'}${weisPoints ? ` | Weis ${weisPoints}` : ''}</div>
         </div>
       `;
     }).join('');
@@ -378,7 +439,7 @@ function renderScorePanel() {
       <div class="score-card${active ? ' active' : ''}${isSolo ? ' special' : ''}">
         <div class="score-name">${escapeHtml(player.name)}</div>
         <div class="score-total">${getDisplayScore(game, player.id)}</div>
-        <div class="score-sub">/ ${game.variant.targetScore}</div>
+        <div class="score-sub">/ ${getGameTargetScore(game)}</div>
         ${player.bid !== null ? `<div class="score-badge">${player.bid === 0 ? 'Pass' : `Gebot ${player.bid}`}</div>` : ''}
         ${game.phase !== 'bidding' && game.phase !== 'setup'
           ? `<div class="score-stats">${player.tricksWon} Stiche | ${player.pointsWon} Pkt</div>`
@@ -389,17 +450,38 @@ function renderScorePanel() {
 }
 
 function renderTrumpDisplay() {
-  if (!game.trumpSuit) {
+  if (!game.roundMode) {
     trumpDisplay.classList.add('hidden');
     trumpDisplay.innerHTML = '';
     return;
   }
 
   trumpDisplay.classList.remove('hidden');
-  trumpDisplay.innerHTML = `
-    <span class="trump-label">Trumpf</span>
-    <img class="trump-suit-icon" src="${cardImagePath({ suit: game.trumpSuit, rank: 'under' })}" alt="">
-    <span>${escapeHtml(SUIT_LABELS[game.trumpSuit])}</span>
+  const modeLabel = getRoundModeLabel(game.roundMode);
+  const content = isTrumpMode(game.roundMode)
+    ? `
+      <span class="trump-label">Spielart</span>
+      <img class="trump-suit-icon" src="${cardImagePath({ suit: game.roundMode, rank: 'under' })}" alt="">
+      <span>${escapeHtml(modeLabel)} Trumpf</span>
+    `
+    : `
+      <span class="trump-label">Spielart</span>
+      <span class="mode-chip">${escapeHtml(modeLabel)}</span>
+    `;
+  trumpDisplay.innerHTML = content;
+}
+
+function renderTargetDisplay() {
+  if (!game) {
+    targetDisplay.classList.add('hidden');
+    targetDisplay.innerHTML = '';
+    return;
+  }
+
+  targetDisplay.classList.remove('hidden');
+  targetDisplay.innerHTML = `
+    <span class="target-label">Ziel</span>
+    <span>${getGameTargetScore(game)} Punkte</span>
   `;
 }
 
@@ -457,7 +539,6 @@ function renderZones() {
         }
 
         applyFanStyle(element, cardIndex, player.hand.length);
-
         handEl.appendChild(element);
       });
       return;
@@ -568,6 +649,36 @@ function renderCapturedPiles() {
   });
 }
 
+function renderWeisPanel() {
+  if (game.phase !== 'announceWeis' || !game.players[game.currentPlayer]?.isHuman) {
+    weisPrompt.textContent = '';
+    weisList.innerHTML = '';
+    return;
+  }
+
+  const options = getPossibleWeisForPlayer(game, game.currentPlayer);
+  if (options.length === 0) {
+    weisPrompt.textContent = 'Du hast keinen gueltigen Weis in dieser Runde.';
+    weisList.innerHTML = '<div class="weis-item is-empty">Kein Weis</div>';
+    btnWeis.textContent = 'Weiter';
+    return;
+  }
+
+  weisPrompt.textContent = options.length === 1
+    ? 'Dein hoechster Weis wird jetzt gemeldet:'
+    : 'Deine moeglichen Weise. Gemeldet wird zuerst dein hoechster Weis:';
+  weisList.innerHTML = options.map((weis, index) => `
+    <div class="weis-item${index === 0 ? ' is-primary' : ''}">
+      <div class="weis-value">${weis.points}</div>
+      <div class="weis-copy">
+        <div class="weis-name">${escapeHtml(describeWeis(weis))}</div>
+        <div class="weis-meta">${weis.type === 'sequence' ? 'Folge' : 'Vier Gleiche'}${index === 0 ? ' | wird gemeldet' : ''}</div>
+      </div>
+    </div>
+  `).join('');
+  btnWeis.textContent = 'Weis bestaetigen';
+}
+
 function renderMessage() {
   msgEl.className = 'message';
 
@@ -581,18 +692,31 @@ function renderMessage() {
   if (game.phase === 'chooseTrump') {
     if (game.players[game.currentPlayer].isHuman) {
       msgEl.textContent = canPushTrump(game)
-      ? 'Wähle Trumpf oder schiebe an deinen Partner.'
-      : 'Wähle den Trumpf.';
+        ? 'Waehle Trumpf, Obe-Abe oder Une-Ufe oder schiebe an deinen Partner.'
+        : 'Waehle die Spielart fuer diese Runde.';
       return;
     }
 
-    msgEl.textContent = `${game.players[game.currentPlayer].name} wählt Trumpf...`;
+    msgEl.textContent = `${game.players[game.currentPlayer].name} waehlt die Spielart...`;
+    return;
+  }
+
+  if (game.phase === 'announceWeis') {
+    if (game.players[game.currentPlayer].isHuman) {
+      const options = getPossibleWeisForPlayer(game, game.currentPlayer);
+      msgEl.textContent = options.length > 0
+        ? 'Pruefe deine Weise und bestaetige deinen hoechsten Weis.'
+        : 'Du hast keinen Weis. Bestaetige die Runde, damit weitergemeldet wird.';
+      return;
+    }
+
+    msgEl.textContent = `${game.players[game.currentPlayer].name} meldet Weis...`;
     return;
   }
 
   if (game.phase === 'playing') {
     msgEl.textContent = game.players[game.currentPlayer].isHuman
-      ? 'Wähle eine Karte zum Spielen.'
+      ? 'Waehle eine Karte zum Spielen.'
       : `${game.players[game.currentPlayer].name} spielt...`;
     return;
   }
@@ -606,7 +730,7 @@ function renderMessage() {
     if (isBieter(game)) {
       const soloPlayer = game.players[game.roundSummary.soloPlayer];
       msgEl.textContent = game.roundSummary.succeeded
-        ? `${soloPlayer.name} erfüllt ${game.roundSummary.bid}.`
+        ? `${soloPlayer.name} erfuellt ${game.roundSummary.bid}.`
         : `${soloPlayer.name} verpasst ${game.roundSummary.bid}.`;
       msgEl.classList.add(game.roundSummary.succeeded ? 'msg-ok' : 'msg-bad');
       return;
@@ -636,9 +760,11 @@ function renderControls() {
   const humanTurn = game.players[game.currentPlayer]?.isHuman;
   const showBid = isBieter(game) && game.phase === 'bidding' && humanTurn;
   const showTrump = game.phase === 'chooseTrump' && humanTurn;
+  const showWeis = game.phase === 'announceWeis' && humanTurn;
 
   bidControls.classList.toggle('hidden', !showBid);
   trumpControls.classList.toggle('hidden', !showTrump);
+  weisControls.classList.toggle('hidden', !showWeis);
   roundEndControls.classList.toggle('hidden', game.phase !== 'roundEnd');
   gameOverControls.classList.toggle('hidden', game.phase !== 'gameOver');
 
@@ -655,7 +781,9 @@ function renderControls() {
   }
 
   if (showTrump) {
-    trumpPrompt.textContent = canPushTrump(game) ? 'Trumpf wählen oder schieben:' : 'Trumpf wählen:';
+    trumpPrompt.textContent = canPushTrump(game)
+      ? 'Spielart waehlen oder schieben:'
+      : 'Spielart waehlen:';
     btnPush.classList.toggle('hidden', !canPushTrump(game));
   }
 }
@@ -674,7 +802,7 @@ function renderRoundSummary() {
       .join(' & ');
 
     roundEndMsg.innerHTML = game.roundSummary.succeeded
-      ? `<strong>${escapeHtml(soloPlayer.name)}</strong> erfüllt ${game.roundSummary.bid}.<br>${game.roundSummary.soloPoints} Punkte in der Runde, +${game.roundSummary.soloGain} Spielpunkte.`
+      ? `<strong>${escapeHtml(soloPlayer.name)}</strong> erfuellt ${game.roundSummary.bid}.<br>${game.roundSummary.soloPoints} Punkte in der Runde, +${game.roundSummary.soloGain} Spielpunkte.`
       : `<strong>${escapeHtml(soloPlayer.name)}</strong> scheitert mit ${game.roundSummary.soloPoints}/${game.roundSummary.bid}.<br>${escapeHtml(soloPlayer.name)}: ${game.roundSummary.soloGain} Spielpunkte.<br>${escapeHtml(defenderNames)}: je +${game.roundSummary.defenderGain} Spielpunkte.`;
     return;
   }
@@ -682,14 +810,24 @@ function renderRoundSummary() {
   const ownTeam = game.roundSummary.results.find((result) => result.teamId === 0);
   const enemyTeam = game.roundSummary.results.find((result) => result.teamId === 1);
   const winner = game.teams.find((team) => team.id === game.roundSummary.roundWinnerTeamId);
+  const weisWinner = game.roundSummary.weisWinnerTeamId === null
+    ? null
+    : game.teams.find((team) => team.id === game.roundSummary.weisWinnerTeamId);
   const pushLine = game.roundSummary.pushed
-    ? `<br>Trumpfwahl wurde an ${escapeHtml(game.players[game.roundSummary.trumpChooser].name)} geschoben.`
+    ? `<br>Spielartwahl wurde an ${escapeHtml(game.players[game.roundSummary.trumpChooser].name)} geschoben.`
     : '';
+  const multiplierLine = game.roundSummary.multiplier > 1
+    ? ` x${game.roundSummary.multiplier}`
+    : '';
+  const weisLine = weisWinner
+    ? `<br>Weis: <strong>${escapeHtml(weisWinner.name)}</strong> schreibt ${game.roundSummary.results.find((result) => result.teamId === weisWinner.id)?.weisPoints ?? 0} Punkte (${escapeHtml(describeWeis(game.roundSummary.highestWeis))}).`
+    : '<br>Weis: Kein Team schreibt.';
 
   roundEndMsg.innerHTML = `
-    <strong>${escapeHtml(ownTeam.name)}</strong>: ${ownTeam.roundPoints} Punkte, ${ownTeam.tricksWon} Stiche<br>
-    <strong>${escapeHtml(enemyTeam.name)}</strong>: ${enemyTeam.roundPoints} Punkte, ${enemyTeam.tricksWon} Stiche<br>
-    Rundensieger: <strong>${escapeHtml(winner.name)}</strong>${pushLine}
+    <strong>Spielart:</strong> ${escapeHtml(getRoundModeLabel(game.roundSummary.roundMode))}${multiplierLine}<br>
+    <strong>${escapeHtml(ownTeam.name)}</strong>: ${ownTeam.trickPoints} Stichpunkte + ${ownTeam.weisPoints} Weis = ${ownTeam.basePoints}${multiplierLine} -> ${ownTeam.roundPoints}<br>
+    <strong>${escapeHtml(enemyTeam.name)}</strong>: ${enemyTeam.trickPoints} Stichpunkte + ${enemyTeam.weisPoints} Weis = ${enemyTeam.basePoints}${multiplierLine} -> ${enemyTeam.roundPoints}<br>
+    Rundensieger: <strong>${escapeHtml(winner.name)}</strong>${weisLine}${pushLine}
   `;
 }
 
@@ -708,9 +846,12 @@ function renderGameOver() {
   }
 
   const ranking = [...game.teams].sort((first, second) => second.totalScore - first.totalScore);
-  gameOverMsg.innerHTML = ranking
-    .map((team, index) => `${index + 1}. ${escapeHtml(team.name)} - ${team.totalScore} Punkte`)
-    .join('<br>');
+  gameOverMsg.innerHTML = `
+    Ziel erreicht: ${getGameTargetScore(game)} Punkte<br><br>
+    ${ranking
+      .map((team, index) => `${index + 1}. ${escapeHtml(team.name)} - ${team.totalScore} Punkte`)
+      .join('<br>')}
+  `;
 }
 
 function renderLog() {
@@ -730,9 +871,11 @@ function render() {
   placeCapturedPiles();
   renderScorePanel();
   renderTrumpDisplay();
+  renderTargetDisplay();
   renderZones();
   renderTrick();
   renderCapturedPiles();
+  renderWeisPanel();
   renderMessage();
   renderControls();
   renderRoundSummary();
@@ -762,8 +905,10 @@ function randomDelay([min, max]) {
 }
 
 function shouldAiPushTrump(player) {
-  const bestSuit = bestTrumpSuit(player.hand);
-  return handValue(player.hand, bestSuit) < 54;
+  const targetScore = getGameTargetScore(game);
+  const bestMode = isSchieber(game) ? bestSchieberMode(player.hand, targetScore) : bestTrumpSuit(player.hand);
+  const weightedValue = handValue(player.hand, bestMode) * getRoundMultiplier(targetScore, bestMode);
+  return weightedValue < (targetScore === 2500 ? 120 : 60);
 }
 
 function gameLoop() {
@@ -788,7 +933,20 @@ function gameLoop() {
         pushTrumpChoice(game);
         return;
       }
+
+      if (isSchieber(game)) {
+        chooseTrump(game, bestSchieberMode(currentPlayer.hand, getGameTargetScore(game)));
+        return;
+      }
+
       chooseTrump(game, bestTrumpSuit(currentPlayer.hand));
+    });
+    return;
+  }
+
+  if (game.phase === 'announceWeis' && !currentPlayer.isHuman) {
+    queueAiAction(randomDelay(AI_DELAYS.weis), () => {
+      submitWeisDeclaration(game, game.currentPlayer);
     });
     return;
   }
@@ -815,7 +973,11 @@ function gameLoop() {
 
 function startSelectedGame() {
   const playerName = playerNameInput.value.trim() || 'Du';
-  game = createGame({ variantId: selectedVariantId, playerName });
+  const matchConfig = selectedVariantId === 'schieber'
+    ? { targetScore: selectedSchieberTargetScore }
+    : {};
+
+  game = createGame({ variantId: selectedVariantId, playerName, matchConfig });
   aiLocked = false;
   animatedTrickCards = new Set();
   closeTrickReview();
@@ -842,6 +1004,16 @@ variantCards.forEach((card) => {
   });
 });
 
+setupTargetOptions.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-target-score]');
+  if (!button) {
+    return;
+  }
+
+  selectedSchieberTargetScore = Number.parseInt(button.dataset.targetScore, 10);
+  setSetupVariant(selectedVariantId);
+});
+
 btnStart.addEventListener('click', startSelectedGame);
 
 playerNameInput.addEventListener('keydown', (event) => {
@@ -862,7 +1034,7 @@ btnBid.addEventListener('click', () => {
 document.querySelectorAll('.trump-btn').forEach((button) => {
   button.addEventListener('click', () => {
     try {
-      chooseTrump(game, button.dataset.suit);
+      chooseTrump(game, button.dataset.mode);
       gameLoop();
     } catch (error) {
       msgEl.textContent = error.message;
@@ -879,6 +1051,15 @@ btnPush.addEventListener('click', () => {
   }
 });
 
+btnWeis.addEventListener('click', () => {
+  try {
+    submitWeisDeclaration(game, game.currentPlayer);
+    gameLoop();
+  } catch (error) {
+    msgEl.textContent = error.message;
+  }
+});
+
 btnNextRound.addEventListener('click', () => {
   animatedTrickCards = new Set();
   closeTrickReview();
@@ -887,7 +1068,7 @@ btnNextRound.addEventListener('click', () => {
 });
 
 btnHome.addEventListener('click', () => {
-  if (window.confirm('Willst du diese Partie wirklich abbrechen und zum Homescreen zurückkehren?')) {
+  if (window.confirm('Willst du diese Partie wirklich abbrechen und zum Homescreen zurueckkehren?')) {
     returnHome();
   }
 });
@@ -918,10 +1099,10 @@ pileEls.forEach((pile, pileId) => {
 
 setSetupVariant(selectedVariantId);
 
-SUITS.forEach((suit) => {
-  const button = document.querySelector(`.trump-btn[data-suit="${suit}"]`);
+ROUND_MODE_OPTIONS.forEach((mode) => {
+  const button = document.querySelector(`.trump-btn[data-mode="${mode}"]`);
   if (button) {
-    button.textContent = SUIT_LABELS[suit];
+    button.textContent = isTrumpMode(mode) ? `${ROUND_MODE_LABELS[mode]} Trumpf` : ROUND_MODE_LABELS[mode];
   }
 });
 
