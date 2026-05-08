@@ -467,11 +467,39 @@ body {
 
 .zone-top {
   grid-area: top;
-  position: relative;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-start;
   width: min(100%, 760px);
   justify-self: center;
-  min-height: calc(var(--ai-card-w) * 1.95 + var(--pile-card-h));
+  min-height: 0;
   overflow: visible;
+  gap: 0.5rem;
+}
+
+.zone-top > .zone-pile-anchor {
+  flex-shrink: 0;
+  width: auto;
+  min-width: clamp(62px, 8vw, 100px);
+  min-height: calc(var(--pile-card-h) + 36px);
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.zone-top-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.32rem;
+  min-width: 0;
+}
+
+.zone-top .zone-head {
+  min-height: auto;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
 }
 
 .zone-right {
@@ -569,6 +597,21 @@ body {
 
 .hand-right {
   align-items: flex-end;
+}
+
+.zone-left .hand-ai {
+  transform: rotate(-90deg);
+  transform-origin: center center;
+}
+
+.zone-right .hand-ai {
+  transform: rotate(90deg);
+  transform-origin: center center;
+}
+
+.zone-top .hand-ai {
+  transform: rotate(180deg);
+  transform-origin: center center;
 }
 
 .hand-human {
@@ -1396,9 +1439,13 @@ body {
     --card-h: calc(var(--card-w) * 1.444);
     --card-r: 11px;
     --hand-overlap: calc(var(--card-w) * -0.72);
-    --ai-card-w: clamp(42px, 11vw, 58px);
+    --ai-card-w: clamp(36px, 9vw, 50px);
     --ai-hand-overlap: calc(var(--ai-card-w) * -0.7);
     --pile-card-w: calc(var(--card-w) * 0.48);
+  }
+
+  #screen-game {
+    padding-bottom: 0;
   }
 
   .variant-picker {
@@ -1519,7 +1566,7 @@ body {
 
   .zone-top {
     width: 100%;
-    min-height: calc(var(--ai-card-w) * 2.05 + var(--pile-card-h));
+    min-height: 0;
   }
 
   .center-zone {
@@ -1656,8 +1703,17 @@ body {
 
   .hand-human {
     width: 100%;
-    min-height: calc(var(--card-h) * var(--human-card-scale) + 26px);
-    padding: 0.25rem 0.3rem 0.15rem;
+    min-height: calc(var(--card-h) * var(--human-card-scale) + 42px);
+    padding: 0.4rem clamp(2.5rem, 7vw, 3.5rem) 0.5rem;
+  }
+
+  .zone-top {
+    gap: 0.3rem;
+    margin-top: -0.3rem;
+  }
+
+  .zone-top > .zone-pile-anchor {
+    min-width: clamp(44px, 10vw, 72px);
   }
 
   .log-panel {

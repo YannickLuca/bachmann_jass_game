@@ -157,12 +157,6 @@ function getPlayerBadge(playerIndex) {
     return player.bid === 0 ? 'Pass' : String(player.bid);
   }
 
-  if (playerIndex === game.dealer) {
-    return 'Geber';
-  }
-  if (playerIndex === 2) {
-    return 'Partner';
-  }
   return '';
 }
 
@@ -352,7 +346,7 @@ function renderSetupTargetOptions() {
   setupTargetOptions.innerHTML = SCHIEBER_TARGET_SCORES.map((score) => {
     const active = selectedSchieberTargetScore === score;
     const copy = score === 1000
-      ? 'Alle Spielarten zaehlen einfach.'
+      ? 'Alle Spielarten zählen einfach.'
       : 'Rosen/Eicheln x1, Schilten/Schellen x2, Obe-Abe/Une-Ufe x3.';
 
     return `
@@ -658,15 +652,15 @@ function renderWeisPanel() {
 
   const options = getPossibleWeisForPlayer(game, game.currentPlayer);
   if (options.length === 0) {
-    weisPrompt.textContent = 'Du hast keinen gueltigen Weis in dieser Runde.';
+    weisPrompt.textContent = 'Du hast keinen gültigen Weis in dieser Runde.';
     weisList.innerHTML = '<div class="weis-item is-empty">Kein Weis</div>';
     btnWeis.textContent = 'Weiter';
     return;
   }
 
   weisPrompt.textContent = options.length === 1
-    ? 'Dein hoechster Weis wird jetzt gemeldet:'
-    : 'Deine moeglichen Weise. Gemeldet wird zuerst dein hoechster Weis:';
+    ? 'Dein höchster Weis wird jetzt gemeldet:'
+    : 'Deine möglichen Weise. Gemeldet wird zuerst dein höchster Weis:';
   weisList.innerHTML = options.map((weis, index) => `
     <div class="weis-item${index === 0 ? ' is-primary' : ''}">
       <div class="weis-value">${weis.points}</div>
@@ -676,7 +670,7 @@ function renderWeisPanel() {
       </div>
     </div>
   `).join('');
-  btnWeis.textContent = 'Weis bestaetigen';
+  btnWeis.textContent = 'Weis bestätigen';
 }
 
 function renderMessage() {
@@ -692,12 +686,12 @@ function renderMessage() {
   if (game.phase === 'chooseTrump') {
     if (game.players[game.currentPlayer].isHuman) {
       msgEl.textContent = canPushTrump(game)
-        ? 'Waehle Trumpf, Obe-Abe oder Une-Ufe oder schiebe an deinen Partner.'
-        : 'Waehle die Spielart fuer diese Runde.';
+        ? 'Wähle Trumpf, Obe-Abe oder Une-Ufe oder schiebe an deinen Partner.'
+        : 'Wähle die Spielart für diese Runde.';
       return;
     }
 
-    msgEl.textContent = `${game.players[game.currentPlayer].name} waehlt die Spielart...`;
+    msgEl.textContent = `${game.players[game.currentPlayer].name} wählt die Spielart...`;
     return;
   }
 
@@ -705,8 +699,8 @@ function renderMessage() {
     if (game.players[game.currentPlayer].isHuman) {
       const options = getPossibleWeisForPlayer(game, game.currentPlayer);
       msgEl.textContent = options.length > 0
-        ? 'Pruefe deine Weise und bestaetige deinen hoechsten Weis.'
-        : 'Du hast keinen Weis. Bestaetige die Runde, damit weitergemeldet wird.';
+        ? 'Prüfe deine Weise und bestätige deinen höchsten Weis.'
+        : 'Du hast keinen Weis. Bestätige die Runde, damit weitergemeldet wird.';
       return;
     }
 
@@ -716,7 +710,7 @@ function renderMessage() {
 
   if (game.phase === 'playing') {
     msgEl.textContent = game.players[game.currentPlayer].isHuman
-      ? 'Waehle eine Karte zum Spielen.'
+      ? 'Wähle eine Karte zum Spielen.'
       : `${game.players[game.currentPlayer].name} spielt...`;
     return;
   }
@@ -730,7 +724,7 @@ function renderMessage() {
     if (isBieter(game)) {
       const soloPlayer = game.players[game.roundSummary.soloPlayer];
       msgEl.textContent = game.roundSummary.succeeded
-        ? `${soloPlayer.name} erfuellt ${game.roundSummary.bid}.`
+        ? `${soloPlayer.name} erfüllt ${game.roundSummary.bid}.`
         : `${soloPlayer.name} verpasst ${game.roundSummary.bid}.`;
       msgEl.classList.add(game.roundSummary.succeeded ? 'msg-ok' : 'msg-bad');
       return;
@@ -782,8 +776,8 @@ function renderControls() {
 
   if (showTrump) {
     trumpPrompt.textContent = canPushTrump(game)
-      ? 'Spielart waehlen oder schieben:'
-      : 'Spielart waehlen:';
+      ? 'Spielart wählen oder schieben:'
+      : 'Spielart wählen:';
     btnPush.classList.toggle('hidden', !canPushTrump(game));
   }
 }
@@ -802,7 +796,7 @@ function renderRoundSummary() {
       .join(' & ');
 
     roundEndMsg.innerHTML = game.roundSummary.succeeded
-      ? `<strong>${escapeHtml(soloPlayer.name)}</strong> erfuellt ${game.roundSummary.bid}.<br>${game.roundSummary.soloPoints} Punkte in der Runde, +${game.roundSummary.soloGain} Spielpunkte.`
+      ? `<strong>${escapeHtml(soloPlayer.name)}</strong> erfüllt ${game.roundSummary.bid}.<br>${game.roundSummary.soloPoints} Punkte in der Runde, +${game.roundSummary.soloGain} Spielpunkte.`
       : `<strong>${escapeHtml(soloPlayer.name)}</strong> scheitert mit ${game.roundSummary.soloPoints}/${game.roundSummary.bid}.<br>${escapeHtml(soloPlayer.name)}: ${game.roundSummary.soloGain} Spielpunkte.<br>${escapeHtml(defenderNames)}: je +${game.roundSummary.defenderGain} Spielpunkte.`;
     return;
   }
@@ -1068,7 +1062,7 @@ btnNextRound.addEventListener('click', () => {
 });
 
 btnHome.addEventListener('click', () => {
-  if (window.confirm('Willst du diese Partie wirklich abbrechen und zum Homescreen zurueckkehren?')) {
+  if (window.confirm('Willst du diese Partie wirklich abbrechen und zum Homescreen zurückkehren?')) {
     returnHome();
   }
 });

@@ -21,7 +21,7 @@
       <h1 class="setup-title">Jass</h1>
       <p id="setup-sub" class="setup-sub">3 Spieler - du spielst alleine gegen 2 Computer</p>
 
-      <div class="variant-picker" aria-label="Jassart waehlen">
+      <div class="variant-picker" aria-label="Jassart wählen">
         <button type="button" class="variant-card active" data-variant="bieter" aria-pressed="true">
           <span class="variant-title">Bieterjass</span>
           <span class="variant-copy">3 Spieler, Gebot, Solo gegen 2</span>
@@ -41,7 +41,7 @@
             <span class="setup-target-label">Punkteziel im Schieber</span>
             <span id="setup-target-hint" class="setup-target-hint"></span>
           </div>
-          <div id="setup-target-options" class="target-picker" aria-label="Punkteziel waehlen"></div>
+          <div id="setup-target-options" class="target-picker" aria-label="Punkteziel wählen"></div>
         </div>
 
         <button id="btn-start" class="btn btn-primary">Spiel starten</button>
@@ -81,14 +81,16 @@
       </section>
 
       <section id="zone-top" class="player-zone zone-top hidden">
-        <div class="zone-head">
-          <div id="pile-anchor-top" class="zone-pile-anchor"></div>
-          <div class="player-label">
-            <span id="pname-top"></span>
-            <span id="badge-top" class="player-badge"></span>
+        <div id="pile-anchor-top" class="zone-pile-anchor"></div>
+        <div class="zone-top-center">
+          <div class="zone-head">
+            <div class="player-label">
+              <span id="pname-top"></span>
+              <span id="badge-top" class="player-badge"></span>
+            </div>
           </div>
+          <div id="hand-top" class="hand hand-ai hand-top"></div>
         </div>
-        <div id="hand-top" class="hand hand-ai hand-top"></div>
       </section>
 
       <section class="center-zone">
@@ -127,7 +129,7 @@
           </div>
 
           <div id="trump-controls" class="control-box hidden">
-            <span id="trump-prompt" class="ctrl-label">Spielart waehlen:</span>
+            <span id="trump-prompt" class="ctrl-label">Spielart wählen:</span>
             <button class="trump-btn btn" type="button" data-mode="eicheln"></button>
             <button class="trump-btn btn" type="button" data-mode="rosen"></button>
             <button class="trump-btn btn" type="button" data-mode="schellen"></button>
@@ -140,12 +142,12 @@
           <div id="weis-controls" class="control-box control-box-weis hidden">
             <div id="weis-prompt" class="ctrl-label"></div>
             <div id="weis-list" class="weis-list"></div>
-            <button id="btn-weis" class="btn btn-accent" type="button">Weis bestaetigen</button>
+            <button id="btn-weis" class="btn btn-accent" type="button">Weis bestätigen</button>
           </div>
 
           <div id="round-end-controls" class="control-box hidden">
             <div id="round-end-msg" class="summary-msg"></div>
-            <button id="btn-next-round" class="btn btn-primary" type="button">Naechste Runde</button>
+            <button id="btn-next-round" class="btn btn-primary" type="button">Nächste Runde</button>
           </div>
 
           <div id="game-over-controls" class="control-box hidden">
@@ -184,7 +186,7 @@
 
     <div id="trick-review" class="trick-review hidden" role="dialog" aria-modal="true" aria-labelledby="trick-review-title">
       <div class="trick-review-box">
-        <button id="btn-close-review" class="review-close" type="button" aria-label="Ansicht schliessen">&times;</button>
+        <button id="btn-close-review" class="review-close" type="button" aria-label="Ansicht schließen">&times;</button>
         <div class="review-kicker">Nochmals anschauen</div>
         <h2 id="trick-review-title">Erster Stich</h2>
         <p id="trick-review-text" class="trick-review-text"></p>

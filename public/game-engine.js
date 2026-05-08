@@ -27,7 +27,7 @@ export const RANK_LABELS = {
   '10': '10',
   under: 'Under',
   ober: 'Ober',
-  koenig: 'Koenig',
+  koenig: 'König',
   ass: 'Ass',
 };
 
@@ -111,10 +111,10 @@ export const GAME_VARIANTS = {
     modeLabel: 'Bieterjass',
     rules: [
       '36 Karten (6 bis Ass), 12 Karten pro Spieler, in 3er-Paketen verteilt.',
-      'Jeder bietet genau einmal. Das hoechste Gebot spielt alleine gegen die anderen zwei.',
-      'Der Hoechstbietende waehlt die Trumpffarbe.',
+      'Jeder bietet genau einmal. Das höchste Gebot spielt alleine gegen die anderen zwei.',
+      'Der Höchstbietende wählt die Trumpffarbe.',
       'Vereinfachte Bedienpflicht mit Trumpfstechen wie in der bisherigen Lokalversion.',
-      'Erfuellt der Bieter sein Gebot, erhaelt er den Gebotswert. Sonst verliert er ihn.',
+      'Erfüllt der Bieter sein Gebot, erhält er den Gebotswert. Sonst verliert er ihn.',
       'Ziel: zuerst 1500 Spielpunkte erreichen.',
     ],
   },
@@ -130,8 +130,8 @@ export const GAME_VARIANTS = {
     rules: [
       '36 Karten (6 bis Ass), 9 Karten pro Spieler, in 3er-Paketen verteilt.',
       'Es wird zu viert in festen Teams gespielt: du mit Partner gegen 2 Computer.',
-      'Vorhand waehlt Trumpf, Obe-Abe oder Une-Ufe oder schiebt die Wahl einmal an den Partner weiter.',
-      'Vor dem ersten Stich wird eine Weis-Phase gespielt. Nur das Team mit dem hoechsten Weis schreibt.',
+      'Vorhand wählt Trumpf, Obe-Abe oder Une-Ufe oder schiebt die Wahl einmal an den Partner weiter.',
+      'Vor dem ersten Stich wird eine Weis-Phase gespielt. Nur das Team mit dem höchsten Weis schreibt.',
       'Zielscore ist 1000 oder 2500. Im 2500er-Spiel gelten Spielart-Multiplikatoren pro Runde.',
       'Letzter Stich gibt in jeder Schieber-Runde 5 Zusatzpunkte.',
     ],
@@ -456,7 +456,7 @@ export function startRound(game) {
   game.chooserPlayer = game.forehandPlayer;
   game.currentPlayer = game.forehandPlayer;
   game.phase = 'chooseTrump';
-  game.log.push(`${game.players[game.forehandPlayer].name} hat die Rosen 7, ist Vorhand und waehlt Spielart oder schiebt.`);
+  game.log.push(`${game.players[game.forehandPlayer].name} hat die Rosen 7, ist Vorhand und wählt Spielart oder schiebt.`);
 }
 
 export function submitBid(game, playerIndex, bidValue) {
@@ -470,10 +470,10 @@ export function submitBid(game, playerIndex, bidValue) {
     throw new Error('Dieser Spieler ist nicht am Zug.');
   }
   if (!BID_VALUES.includes(bidValue)) {
-    throw new Error('Ungueltiger Gebotswert.');
+    throw new Error('Ungültiger Gebotswert.');
   }
   if (bidValue !== 0 && bidValue <= game.highestBid) {
-    throw new Error(`Gebot muss hoeher als ${game.highestBid} sein.`);
+    throw new Error(`Gebot muss höher als ${game.highestBid} sein.`);
   }
 
   const player = game.players[playerIndex];
@@ -521,14 +521,14 @@ export function canPushTrump(game) {
 
 export function pushTrumpChoice(game) {
   if (!canPushTrump(game)) {
-    throw new Error('Schieben ist aktuell nicht moeglich.');
+    throw new Error('Schieben ist aktuell nicht möglich.');
   }
 
   const partnerIndex = partnerOf(game, game.forehandPlayer);
   game.trumpWasPushed = true;
   game.chooserPlayer = partnerIndex;
   game.currentPlayer = partnerIndex;
-  game.log.push(`${game.players[game.forehandPlayer].name} schiebt. ${game.players[partnerIndex].name} waehlt die Spielart.`);
+  game.log.push(`${game.players[game.forehandPlayer].name} schiebt. ${game.players[partnerIndex].name} wählt die Spielart.`);
 }
 
 function getAnnouncementOrder(game) {
@@ -631,7 +631,7 @@ export function describeWeis(weis) {
   if (weis.type === 'sequence') {
     return `${weis.points}er Folge ${SUIT_LABELS[weis.suit]} ${RANK_LABELS[weis.lowRank]}-${RANK_LABELS[weis.highRank]}`;
   }
-  return `${weis.points} fuer 4x ${RANK_LABELS[weis.relevantRank]}`;
+  return `${weis.points} für 4x ${RANK_LABELS[weis.relevantRank]}`;
 }
 
 export function detectWeis(hand, roundMode = null) {
@@ -687,13 +687,13 @@ function highestWeis(weisen, roundMode) {
 function formatModeChoice(mode, chooserName, leaderName, chooserStarts) {
   if (isTrumpMode(mode)) {
     return chooserStarts
-      ? `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]} als Trumpf und spielt aus.`
-      : `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]} als Trumpf. ${leaderName} spielt aus.`;
+      ? `${chooserName} wählt ${ROUND_MODE_LABELS[mode]} als Trumpf und spielt aus.`
+      : `${chooserName} wählt ${ROUND_MODE_LABELS[mode]} als Trumpf. ${leaderName} spielt aus.`;
   }
 
   return chooserStarts
-    ? `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]} und spielt aus.`
-    : `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]}. ${leaderName} spielt aus.`;
+    ? `${chooserName} wählt ${ROUND_MODE_LABELS[mode]} und spielt aus.`
+    : `${chooserName} wählt ${ROUND_MODE_LABELS[mode]}. ${leaderName} spielt aus.`;
 }
 
 function startWeisPhase(game) {
@@ -727,7 +727,7 @@ function finishWeisPhase(game) {
   const declaredEntries = game.weisState.declaredEntries.filter((entry) => entry.weis);
 
   if (declaredEntries.length === 0) {
-    game.log.push('Kein Team meldet einen gueltigen Weis.');
+    game.log.push('Kein Team meldet einen gültigen Weis.');
     game.phase = 'playing';
     game.currentPlayer = game.trickLeader;
     return;
@@ -796,7 +796,7 @@ export function submitWeisDeclaration(game, playerIndex, selectedWeisId = null) 
   if (selectedWeisId) {
     selectedWeis = available.find((weis) => weis.id === selectedWeisId) || null;
     if (!selectedWeis) {
-      throw new Error('Dieser Weis ist fuer den Spieler nicht gueltig.');
+      throw new Error('Dieser Weis ist für den Spieler nicht gültig.');
     }
   } else {
     selectedWeis = game.weisState.highestByPlayer[playerIndex] || null;
@@ -823,7 +823,7 @@ export function chooseTrump(game, roundMode) {
     throw new Error('Nicht in der Spielartwahl.');
   }
   if (game.currentPlayer < 0 || game.currentPlayer >= game.players.length) {
-    throw new Error('Kein gueltiger Spieler fuer die Spielartwahl.');
+    throw new Error('Kein gültiger Spieler für die Spielartwahl.');
   }
 
   const allowedModes = isSchieber(game) ? ROUND_MODE_OPTIONS : SUITS;
@@ -1169,7 +1169,7 @@ function resolveBieterRound(game) {
   };
 
   if (succeeded) {
-    game.log.push(`${soloPlayer.name} erfuellt ${bid} und erhaelt ${soloGain} Spielpunkte.`);
+    game.log.push(`${soloPlayer.name} erfüllt ${bid} und erhält ${soloGain} Spielpunkte.`);
   } else {
     game.log.push(`${soloPlayer.name} scheitert mit ${soloPoints}/${bid} Punkten.`);
     if (defenderGain > 0) {
