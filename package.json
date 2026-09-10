@@ -1,14 +1,15 @@
 {
-  "name": "bieterjass-local",
-  "version": "1.0.0",
-  "description": "Lokale Bieterjass-Testapp fuer 3 Spieler mit Schweizer Karten und Spiel-Logik",
+  "name": "bachmann-jass",
+  "version": "1.1.0",
+  "description": "Schweizer Jass (Schieber und Bieterjass) als lokale Web-App und PWA",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
     "deploy": "node scripts/build-gh-pages.mjs",
-    "test:browser": "powershell -ExecutionPolicy Bypass -File scripts/run-browser-tests.ps1"
+    "test": "node --test tests/engine/*.test.mjs",
+    "check:docs": "node scripts/build-gh-pages.mjs --check"
   },
   "dependencies": {
     "express": "^4.19.2"

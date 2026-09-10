@@ -4,7 +4,8 @@ import {
   ROUND_MODE_LABELS,
   ROUND_MODE_OPTIONS,
   SCHIEBER_TARGET_SCORES,
-  SUITS,
+  AI_DIFFICULTIES,
+  AI_DIFFICULTY_LABELS,
   cardImagePath,
   cardLabel,
   createGame,
@@ -17,26 +18,31 @@ import {
   resolveTrick,
   startNextTrick,
   getPlayableCardsForPlayer,
-  aiBidDecision,
-  bestTrumpSuit,
-  bestSchieberMode,
-  handValue,
-  aiChooseCard,
   getDisplayScore,
   getGameTargetScore,
   getRoundMultiplier,
   getRoundModeLabel,
   getSchieberTeamBasePoints,
   getSchieberTeamRoundPoints,
+  getSchieberTeamMatchPoints,
+  getTeamStoeckPoints,
   getTeamWeisPoints,
   getPossibleWeisForPlayer,
   submitWeisDeclaration,
+  declineWeis,
   describeWeis,
   isBieter,
   isSchieber,
   isTrumpMode,
   pileIdForWinner,
 } from './game-engine.js';
+import {
+  aiBidDecision,
+  aiChooseCard,
+  bestSchieberMode,
+  bestTrumpSuit,
+  shouldPushTrump,
+} from './ai.js';
 
 const ZONE_POSITIONS = ['left', 'top', 'right', 'bottom'];
 const PLAYER_POSITIONS = {
@@ -51,8 +57,15 @@ const AI_DELAYS = {
   trickEnd: [1700, 2500],
 };
 
+const DIFFICULTY_COPY = {
+  einfach: 'Spielt geradeaus, ohne Plan. Gut zum Reinkommen.',
+  normal: 'Zieht Trumpf, schmiert dem Partner und sticht sparsam.',
+  schwer: 'Merkt sich zusätzlich alle gespielten Karten.',
+};
+
 let selectedVariantId = 'bieter';
 let selectedSchieberTargetScore = 1000;
+let selectedDifficulty = 'normal';
 let game = null;
 let aiLocked = false;
 let animatedTrickCards = new Set();
@@ -64,9 +77,13 @@ const setupRulesList = document.getElementById('setup-rules-list');
 const setupTargetSection = document.getElementById('setup-target-section');
 const setupTargetOptions = document.getElementById('setup-target-options');
 const setupTargetHint = document.getElementById('setup-target-hint');
+const setupDifficultyOptions = document.getElementById('setup-difficulty-options');
+const setupDifficultyHint = document.getElementById('setup-difficulty-hint');
 const variantCards = [...document.querySelectorAll('.variant-card')];
 const playerNameInput = document.getElementById('player-name');
 const btnStart = document.getElementById('btn-start');
+const btnResume = document.getElementById('btn-resume');
+const resumeHint = document.getElementById('resume-hint');
 const scorePanel = document.getElementById('score-panel');
 const msgEl = document.getElementById('message');
 const trumpDisplay = document.getElementById('trump-display');
@@ -86,6 +103,7 @@ const weisControls = document.getElementById('weis-controls');
 const weisPrompt = document.getElementById('weis-prompt');
 const weisList = document.getElementById('weis-list');
 const btnWeis = document.getElementById('btn-weis');
+const btnWeisSkip = document.getElementById('btn-weis-skip');
 const roundEndControls = document.getElementById('round-end-controls');
 const roundEndMsg = document.getElementById('round-end-msg');
 const btnNextRound = document.getElementById('btn-next-round');
@@ -124,6 +142,104 @@ const pileEls = [0, 1].map((pileId) => ({
   deck: document.getElementById(`pile-deck-${pileId}`),
   count: document.getElementById(`pile-count-${pileId}`),
 }));
+
+const STORAGE_KEY = 'bachmann-jass:game:v1';
+const SETTINGS_KEY = 'bachmann-jass:settings:v1';
+
+/**
+ * localStorage kann in privaten Fenstern oder bei blockierten Site-Daten werfen.
+ * Die App muss auch dann laufen, nur eben ohne Speicherstand.
+ */
+function withStorage(action, fallback = null) {
+  try {
+    return action(window.localStorage);
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function saveGame() {
+  if (!game || game.phase === 'gameOver') {
+    return;
+  }
+  withStorage((store) => store.setItem(STORAGE_KEY, JSON.stringify({
+    savedAt: Date.now(),
+    game,
+  })));
+}
+
+function clearSavedGame() {
+  withStorage((store) => store.removeItem(STORAGE_KEY));
+}
+
+function loadSavedGame() {
+  return withStorage((store) => {
+    const raw = store.getItem(STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    const saved = parsed?.game;
+    if (!saved || !GAME_VARIANTS[saved.variantId] || ['setup', 'gameOver'].includes(saved.phase)) {
+      return null;
+    }
+
+    // Die Variantendefinition wird frisch verknuepft, damit Regelaenderungen
+    // auch in einer laufenden Partie greifen.
+    saved.variant = GAME_VARIANTS[saved.variantId];
+    return { game: saved, savedAt: parsed.savedAt };
+  });
+}
+
+function saveSettings() {
+  withStorage((store) => store.setItem(SETTINGS_KEY, JSON.stringify({
+    playerName: playerNameInput.value.trim(),
+    variantId: selectedVariantId,
+    targetScore: selectedSchieberTargetScore,
+    difficulty: selectedDifficulty,
+  })));
+}
+
+function restoreSettings() {
+  const settings = withStorage((store) => JSON.parse(store.getItem(SETTINGS_KEY) || 'null'));
+  if (!settings) {
+    return;
+  }
+
+  if (settings.playerName) {
+    playerNameInput.value = settings.playerName;
+  }
+  if (GAME_VARIANTS[settings.variantId]) {
+    selectedVariantId = settings.variantId;
+  }
+  if (SCHIEBER_TARGET_SCORES.includes(settings.targetScore)) {
+    selectedSchieberTargetScore = settings.targetScore;
+  }
+  if (AI_DIFFICULTIES.includes(settings.difficulty)) {
+    selectedDifficulty = settings.difficulty;
+  }
+}
+
+function renderResumeOption() {
+  const saved = loadSavedGame();
+  if (!saved) {
+    btnResume.classList.add('hidden');
+    resumeHint.classList.add('hidden');
+    resumeHint.textContent = '';
+    return;
+  }
+
+  const variantLabel = GAME_VARIANTS[saved.game.variantId].label;
+  const savedDate = new Date(saved.savedAt);
+  const timeLabel = Number.isNaN(savedDate.getTime())
+    ? ''
+    : ` - ${savedDate.toLocaleDateString('de-CH')} ${savedDate.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}`;
+
+  btnResume.classList.remove('hidden');
+  resumeHint.classList.remove('hidden');
+  resumeHint.textContent = `${variantLabel}, Runde ${saved.game.roundNumber}${timeLabel}`;
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -367,6 +483,24 @@ function renderSetupTargetOptions() {
     : '1000er-Partie ohne Spielart-Multiplikatoren.';
 }
 
+function renderSetupDifficultyOptions() {
+  setupDifficultyOptions.innerHTML = AI_DIFFICULTIES.map((level) => {
+    const active = selectedDifficulty === level;
+    return `
+      <button
+        type="button"
+        class="target-card${active ? ' active' : ''}"
+        data-difficulty="${level}"
+        aria-pressed="${active ? 'true' : 'false'}"
+      >
+        <span class="target-title">${escapeHtml(AI_DIFFICULTY_LABELS[level])}</span>
+      </button>
+    `;
+  }).join('');
+
+  setupDifficultyHint.textContent = DIFFICULTY_COPY[selectedDifficulty];
+}
+
 function setSetupVariant(variantId) {
   selectedVariantId = variantId;
   const variant = getSelectedVariant();
@@ -389,6 +523,7 @@ function setSetupVariant(variantId) {
     .join('');
 
   renderSetupTargetOptions();
+  renderSetupDifficultyOptions();
 }
 
 function applyVariantClasses() {
@@ -409,6 +544,8 @@ function renderScorePanel() {
       const roundPoints = getSchieberTeamRoundPoints(game, team.id);
       const basePoints = getSchieberTeamBasePoints(game, team.id);
       const weisPoints = getTeamWeisPoints(game, team.id);
+      const stoeckPoints = getTeamStoeckPoints(game, team.id);
+      const matchPoints = getSchieberTeamMatchPoints(game, team.id);
       const tricks = teamRoundTricks(team.id);
       const active = team.id === currentTeamId && isInteractivePhase();
       const allied = team.id === game.players[0].teamId;
@@ -419,7 +556,7 @@ function renderScorePanel() {
           <div class="score-name">${escapeHtml(team.name)}</div>
           <div class="score-total">${roundPoints}</div>
           <div class="score-sub">Runde ${basePoints}${multiplierText} | Gesamt ${team.totalScore}/${targetScore}</div>
-          <div class="score-stats">${tricks} ${tricks === 1 ? 'Stich' : 'Stiche'}${weisPoints ? ` | Weis ${weisPoints}` : ''}</div>
+          <div class="score-stats">${tricks} ${tricks === 1 ? 'Stich' : 'Stiche'}${weisPoints ? ` | Weis ${weisPoints}` : ''}${stoeckPoints ? ` | Stöck ${stoeckPoints}` : ''}${matchPoints ? ' | Match' : ''}</div>
         </div>
       `;
     }).join('');
@@ -651,13 +788,21 @@ function renderWeisPanel() {
   }
 
   const options = getPossibleWeisForPlayer(game, game.currentPlayer);
+  const ownStoeck = game.stoeckPlayer === game.currentPlayer
+    ? '<div class="weis-item is-stoeck"><div class="weis-value">20</div><div class="weis-copy"><div class="weis-name">Stöck</div><div class="weis-meta">König + Ober im Trumpf | zählt automatisch</div></div></div>'
+    : '';
+
   if (options.length === 0) {
-    weisPrompt.textContent = 'Du hast keinen gültigen Weis in dieser Runde.';
-    weisList.innerHTML = '<div class="weis-item is-empty">Kein Weis</div>';
+    weisPrompt.textContent = ownStoeck
+      ? 'Du hast keinen Weis, aber Stöck.'
+      : 'Du hast keinen gültigen Weis in dieser Runde.';
+    weisList.innerHTML = ownStoeck || '<div class="weis-item is-empty">Kein Weis</div>';
     btnWeis.textContent = 'Weiter';
+    btnWeisSkip.classList.add('hidden');
     return;
   }
 
+  btnWeisSkip.classList.remove('hidden');
   weisPrompt.textContent = options.length === 1
     ? 'Dein höchster Weis wird jetzt gemeldet:'
     : 'Deine möglichen Weise. Gemeldet wird zuerst dein höchster Weis:';
@@ -669,7 +814,7 @@ function renderWeisPanel() {
         <div class="weis-meta">${weis.type === 'sequence' ? 'Folge' : 'Vier Gleiche'}${index === 0 ? ' | wird gemeldet' : ''}</div>
       </div>
     </div>
-  `).join('');
+  `).join('') + ownStoeck;
   btnWeis.textContent = 'Weis bestätigen';
 }
 
@@ -816,12 +961,35 @@ function renderRoundSummary() {
   const weisLine = weisWinner
     ? `<br>Weis: <strong>${escapeHtml(weisWinner.name)}</strong> schreibt ${game.roundSummary.results.find((result) => result.teamId === weisWinner.id)?.weisPoints ?? 0} Punkte (${escapeHtml(describeWeis(game.roundSummary.highestWeis))}).`
     : '<br>Weis: Kein Team schreibt.';
+  const stoeckLine = game.roundSummary.stoeckPlayer >= 0
+    ? `<br>Stöck: <strong>${escapeHtml(game.players[game.roundSummary.stoeckPlayer].name)}</strong> schreibt 20 Punkte.`
+    : '';
+  const matchTeam = game.roundSummary.matchTeamId === null
+    ? null
+    : game.teams.find((team) => team.id === game.roundSummary.matchTeamId);
+  const matchLine = matchTeam
+    ? `<br>Match: <strong>${escapeHtml(matchTeam.name)}</strong> holt alle Stiche und schreibt 100 Zusatzpunkte.`
+    : '';
+
+  const teamLine = (result) => {
+    const parts = [`${result.trickPoints} Stichpunkte`];
+    if (result.weisPoints > 0) {
+      parts.push(`${result.weisPoints} Weis`);
+    }
+    if (result.stoeckPoints > 0) {
+      parts.push(`${result.stoeckPoints} Stöck`);
+    }
+    if (result.matchPoints > 0) {
+      parts.push(`${result.matchPoints} Match`);
+    }
+    return `<strong>${escapeHtml(result.name)}</strong>: ${parts.join(' + ')} = ${result.basePoints}${multiplierLine} -> ${result.roundPoints}`;
+  };
 
   roundEndMsg.innerHTML = `
     <strong>Spielart:</strong> ${escapeHtml(getRoundModeLabel(game.roundSummary.roundMode))}${multiplierLine}<br>
-    <strong>${escapeHtml(ownTeam.name)}</strong>: ${ownTeam.trickPoints} Stichpunkte + ${ownTeam.weisPoints} Weis = ${ownTeam.basePoints}${multiplierLine} -> ${ownTeam.roundPoints}<br>
-    <strong>${escapeHtml(enemyTeam.name)}</strong>: ${enemyTeam.trickPoints} Stichpunkte + ${enemyTeam.weisPoints} Weis = ${enemyTeam.basePoints}${multiplierLine} -> ${enemyTeam.roundPoints}<br>
-    Rundensieger: <strong>${escapeHtml(winner.name)}</strong>${weisLine}${pushLine}
+    ${teamLine(ownTeam)}<br>
+    ${teamLine(enemyTeam)}<br>
+    Rundensieger: <strong>${escapeHtml(winner.name)}</strong>${weisLine}${stoeckLine}${matchLine}${pushLine}
   `;
 }
 
@@ -898,15 +1066,9 @@ function randomDelay([min, max]) {
   return min + Math.floor(Math.random() * (max - min + 1));
 }
 
-function shouldAiPushTrump(player) {
-  const targetScore = getGameTargetScore(game);
-  const bestMode = isSchieber(game) ? bestSchieberMode(player.hand, targetScore) : bestTrumpSuit(player.hand);
-  const weightedValue = handValue(player.hand, bestMode) * getRoundMultiplier(targetScore, bestMode);
-  return weightedValue < (targetScore === 2500 ? 120 : 60);
-}
-
 function gameLoop() {
   render();
+  saveGame();
 
   if (!game || aiLocked) {
     return;
@@ -923,7 +1085,7 @@ function gameLoop() {
 
   if (game.phase === 'chooseTrump' && !currentPlayer.isHuman) {
     queueAiAction(randomDelay(AI_DELAYS.trump), () => {
-      if (canPushTrump(game) && shouldAiPushTrump(currentPlayer)) {
+      if (canPushTrump(game) && shouldPushTrump(currentPlayer.hand, getGameTargetScore(game))) {
         pushTrumpChoice(game);
         return;
       }
@@ -965,11 +1127,31 @@ function gameLoop() {
   }
 }
 
+function resumeSavedGame() {
+  const saved = loadSavedGame();
+  if (!saved) {
+    renderResumeOption();
+    return;
+  }
+
+  game = saved.game;
+  aiLocked = false;
+  animatedTrickCards = new Set();
+  closeTrickReview();
+
+  screenSetup.classList.add('hidden');
+  screenGame.classList.remove('hidden');
+  gameLoop();
+}
+
 function startSelectedGame() {
   const playerName = playerNameInput.value.trim() || 'Du';
   const matchConfig = selectedVariantId === 'schieber'
-    ? { targetScore: selectedSchieberTargetScore }
-    : {};
+    ? { targetScore: selectedSchieberTargetScore, difficulty: selectedDifficulty }
+    : { difficulty: selectedDifficulty };
+
+  saveSettings();
+  clearSavedGame();
 
   game = createGame({ variantId: selectedVariantId, playerName, matchConfig });
   aiLocked = false;
@@ -988,14 +1170,26 @@ function returnHome() {
   aiLocked = false;
   animatedTrickCards = new Set();
   closeTrickReview();
+  clearSavedGame();
   screenGame.classList.add('hidden');
   screenSetup.classList.remove('hidden');
+  renderResumeOption();
 }
 
 variantCards.forEach((card) => {
   card.addEventListener('click', () => {
     setSetupVariant(card.dataset.variant);
   });
+});
+
+setupDifficultyOptions.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-difficulty]');
+  if (!button) {
+    return;
+  }
+
+  selectedDifficulty = button.dataset.difficulty;
+  renderSetupDifficultyOptions();
 });
 
 setupTargetOptions.addEventListener('click', (event) => {
@@ -1009,6 +1203,7 @@ setupTargetOptions.addEventListener('click', (event) => {
 });
 
 btnStart.addEventListener('click', startSelectedGame);
+btnResume.addEventListener('click', resumeSavedGame);
 
 playerNameInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
@@ -1054,6 +1249,15 @@ btnWeis.addEventListener('click', () => {
   }
 });
 
+btnWeisSkip.addEventListener('click', () => {
+  try {
+    declineWeis(game, game.currentPlayer);
+    gameLoop();
+  } catch (error) {
+    msgEl.textContent = error.message;
+  }
+});
+
 btnNextRound.addEventListener('click', () => {
   animatedTrickCards = new Set();
   closeTrickReview();
@@ -1091,7 +1295,17 @@ pileEls.forEach((pile, pileId) => {
   });
 });
 
+restoreSettings();
 setSetupVariant(selectedVariantId);
+renderResumeOption();
+
+// Beim Wegschalten der App (iOS beendet PWAs im Hintergrund) sofort sichern.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    saveGame();
+  }
+});
+window.addEventListener('pagehide', saveGame);
 
 ROUND_MODE_OPTIONS.forEach((mode) => {
   const button = document.querySelector(`.trump-btn[data-mode="${mode}"]`);

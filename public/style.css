@@ -268,6 +268,13 @@ body {
   color: var(--muted);
 }
 
+.resume-hint {
+  margin-top: -0.15rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+}
+
 .setup-rules {
   margin-top: 1.6rem;
   color: var(--muted);
@@ -1225,6 +1232,11 @@ body {
 .weis-item.is-primary {
   border-color: rgba(213, 169, 58, 0.5);
   background: rgba(213, 169, 58, 0.12);
+}
+
+.weis-item.is-stoeck {
+  border-color: rgba(120, 200, 140, 0.45);
+  background: rgba(120, 200, 140, 0.12);
 }
 
 .weis-item.is-empty {

@@ -17,6 +17,12 @@ export const ROUND_MODE_LABELS = {
 };
 
 export const SCHIEBER_TARGET_SCORES = [1000, 2500];
+export const AI_DIFFICULTIES = ['einfach', 'normal', 'schwer'];
+export const AI_DIFFICULTY_LABELS = {
+  einfach: 'Einfach',
+  normal: 'Normal',
+  schwer: 'Schwer',
+};
 
 export const RANKS = ['6', '7', '8', '9', '10', 'under', 'ober', 'koenig', 'ass'];
 export const RANK_LABELS = {
@@ -27,7 +33,7 @@ export const RANK_LABELS = {
   '10': '10',
   under: 'Under',
   ober: 'Ober',
-  koenig: 'Koenig',
+  koenig: 'König',
   ass: 'Ass',
 };
 
@@ -97,6 +103,26 @@ const SEQUENCE_POINTS = {
   9: 300,
 };
 
+/**
+ * Zentrale Regelvarianten der offiziellen Schweizer Jassregeln.
+ * Regional abweichende Punkte stehen hier an einer Stelle statt verstreut im Code.
+ */
+export const RULE_SET = {
+  lastTrickBonus: 5,
+  matchBonus: 100,
+  stoeckPoints: 20,
+  fourSixesCount: false,
+  fourOfAKindBeatsSequence: true,
+  roundMultipliers: {
+    schellen: 1,
+    schilten: 1,
+    rosen: 2,
+    eicheln: 2,
+    obeAbe: 3,
+    uneUfe: 4,
+  },
+};
+
 export const BID_VALUES = [0, 60, 70, 80, 90, 100, 110, 120, 130, 140, 157];
 
 export const GAME_VARIANTS = {
@@ -111,10 +137,10 @@ export const GAME_VARIANTS = {
     modeLabel: 'Bieterjass',
     rules: [
       '36 Karten (6 bis Ass), 12 Karten pro Spieler, in 3er-Paketen verteilt.',
-      'Jeder bietet genau einmal. Das hoechste Gebot spielt alleine gegen die anderen zwei.',
-      'Der Hoechstbietende waehlt die Trumpffarbe.',
-      'Vereinfachte Bedienpflicht mit Trumpfstechen wie in der bisherigen Lokalversion.',
-      'Erfuellt der Bieter sein Gebot, erhaelt er den Gebotswert. Sonst verliert er ihn.',
+      'Es wird gesteigert, bis alle bis auf einen passen. Der Höchstbietende spielt alleine gegen die anderen zwei.',
+      'Der Höchstbietende wählt die Trumpffarbe.',
+      'Bedienpflicht nach offiziellen Schweizer Regeln: Farbe bedienen, kein Trumpfzwang, kein Untertrumpfen.',
+      'Erfüllt der Bieter sein Gebot, erhält er den Gebotswert. Sonst verliert er ihn.',
       'Ziel: zuerst 1500 Spielpunkte erreichen.',
     ],
   },
@@ -130,10 +156,11 @@ export const GAME_VARIANTS = {
     rules: [
       '36 Karten (6 bis Ass), 9 Karten pro Spieler, in 3er-Paketen verteilt.',
       'Es wird zu viert in festen Teams gespielt: du mit Partner gegen 2 Computer.',
-      'Vorhand waehlt Trumpf, Obe-Abe oder Une-Ufe oder schiebt die Wahl einmal an den Partner weiter.',
-      'Vor dem ersten Stich wird eine Weis-Phase gespielt. Nur das Team mit dem hoechsten Weis schreibt.',
-      'Zielscore ist 1000 oder 2500. Im 2500er-Spiel gelten Spielart-Multiplikatoren pro Runde.',
-      'Letzter Stich gibt in jeder Schieber-Runde 5 Zusatzpunkte.',
+      'Vorhand wählt Trumpf, Obe-Abe oder Une-Ufe oder schiebt die Wahl einmal an den Partner weiter.',
+      'Vor dem ersten Stich wird gewiesen. Nur das Team mit dem höchsten Weis schreibt seine Weise.',
+      'Stöck (König + Ober der Trumpffarbe) gibt 20 Punkte, unabhängig vom Weis-Vergleich.',
+      'Letzter Stich gibt 5 Zusatzpunkte, alle neun Stiche (Match) geben 100 Zusatzpunkte.',
+      'Zielscore ist 1000 oder 2500. Im 2500er gelten Multiplikatoren: Schellen/Schilten x1, Rosen/Eicheln x2, Obe-Abe x3, Une-Ufe x4.',
     ],
   },
 };
@@ -162,16 +189,28 @@ export function normalizeSchieberTargetScore(targetScore) {
   return SCHIEBER_TARGET_SCORES.includes(targetScore) ? targetScore : 1000;
 }
 
+export function normalizeDifficulty(difficulty) {
+  return AI_DIFFICULTIES.includes(difficulty) ? difficulty : 'normal';
+}
+
 function normalizeMatchConfig(variantId, matchConfig = {}) {
+  const difficulty = normalizeDifficulty(matchConfig.difficulty);
+
   if (variantId !== 'schieber') {
     return {
       targetScore: GAME_VARIANTS[variantId].targetScore,
+      difficulty,
     };
   }
 
   return {
     targetScore: normalizeSchieberTargetScore(matchConfig.targetScore),
+    difficulty,
   };
+}
+
+export function getGameDifficulty(game) {
+  return normalizeDifficulty(game.matchConfig?.difficulty);
 }
 
 export function getGameTargetScore(game) {
@@ -189,13 +228,7 @@ export function getRoundMultiplier(gameOrTargetScore, maybeRoundMode = null) {
   if (targetScore !== 2500) {
     return 1;
   }
-  if (roundMode === 'obeAbe' || roundMode === 'uneUfe') {
-    return 3;
-  }
-  if (roundMode === 'schellen' || roundMode === 'schilten') {
-    return 2;
-  }
-  return 1;
+  return RULE_SET.roundMultipliers[roundMode] ?? 1;
 }
 
 export function cardImagePath(card) {
@@ -233,10 +266,32 @@ export function createDeck() {
   })));
 }
 
+let randomSource = Math.random;
+
+/**
+ * Setzt eine reproduzierbare Zufallsquelle (mulberry32). Ohne Seed wird Math.random verwendet.
+ * Damit lassen sich KI-Varianten ueber identische Kartenverteilungen vergleichen.
+ */
+export function setRandomSeed(seed) {
+  if (seed === null || seed === undefined) {
+    randomSource = Math.random;
+    return;
+  }
+
+  let state = seed >>> 0;
+  randomSource = () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function shuffle(cards) {
   const deck = [...cards];
   for (let index = deck.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const swapIndex = Math.floor(randomSource() * (index + 1));
     [deck[index], deck[swapIndex]] = [deck[swapIndex], deck[index]];
   }
   return deck;
@@ -320,6 +375,7 @@ export function createGame({ variantId = 'bieter', playerName = 'Du', matchConfi
     currentPlayer: 0,
     biddingOrder: [],
     biddingIndex: 0,
+    biddingPassed: [],
     highestBid: 0,
     highestBidder: -1,
     roundMode: null,
@@ -331,6 +387,7 @@ export function createGame({ variantId = 'bieter', playerName = 'Du', matchConfi
     trick: [],
     trickLeader: -1,
     trickNumber: 0,
+    playedCards: [],
     capturedCards: { 0: [], 1: [] },
     capturedTricks: { 0: 0, 1: 0 },
     capturedPileOwners: { 0: 0, 1: 1 },
@@ -338,6 +395,8 @@ export function createGame({ variantId = 'bieter', playerName = 'Du', matchConfi
     lastCapturedPile: null,
     teamWeisScores: { 0: 0, 1: 0 },
     teamWeisBreakdown: { 0: [], 1: [] },
+    teamStoeckPoints: { 0: 0, 1: 0 },
+    stoeckPlayer: -1,
     weisState: null,
     log: [],
     roundSummary: null,
@@ -404,11 +463,15 @@ function playerIndexWithCard(hands, cardId) {
 }
 
 export function startRound(game) {
+  const isFirstRound = game.roundNumber === 0;
   game.roundNumber += 1;
-  game.dealer = (game.dealer + 1) % game.players.length;
+  if (!isFirstRound) {
+    game.dealer = nextPlayerIndex(game, game.dealer);
+  }
   game.currentPlayer = 0;
   game.biddingOrder = [];
   game.biddingIndex = 0;
+  game.biddingPassed = [];
   game.highestBid = 0;
   game.highestBidder = -1;
   game.roundMode = null;
@@ -420,6 +483,7 @@ export function startRound(game) {
   game.trick = [];
   game.trickLeader = -1;
   game.trickNumber = 0;
+  game.playedCards = [];
   game.capturedCards = { 0: [], 1: [] };
   game.capturedTricks = { 0: 0, 1: 0 };
   game.capturedPileOwners = { 0: 0, 1: 1 };
@@ -427,6 +491,8 @@ export function startRound(game) {
   game.lastCapturedPile = null;
   game.teamWeisScores = { 0: 0, 1: 0 };
   game.teamWeisBreakdown = { 0: [], 1: [] };
+  game.teamStoeckPoints = { 0: 0, 1: 0 };
+  game.stoeckPlayer = -1;
   game.weisState = null;
   game.roundSummary = null;
 
@@ -435,6 +501,17 @@ export function startRound(game) {
     resetRoundPlayerState(player);
     player.hand = sortPlayerHand(hands[playerIndex]);
   });
+
+  if (isSchieber(game)) {
+    // Die Rosen 7 bestimmt nur den ersten Geber. Danach ruecken Geber und Vorhand
+    // jede Runde gemeinsam weiter, damit die Spielartwahl reihum geht.
+    if (isFirstRound) {
+      game.forehandPlayer = playerIndexWithCard(hands, SCHIEBER_START_CARD_ID);
+      game.dealer = (game.forehandPlayer - 1 + game.players.length) % game.players.length;
+    } else {
+      game.forehandPlayer = nextPlayerIndex(game, game.dealer);
+    }
+  }
 
   game.log = [roundHeader(game)];
   game.log.push(`Gemischt und in ${game.variant.dealPacketSize}er-Paketen verteilt.`);
@@ -452,11 +529,12 @@ export function startRound(game) {
     return;
   }
 
-  game.forehandPlayer = playerIndexWithCard(hands, SCHIEBER_START_CARD_ID);
   game.chooserPlayer = game.forehandPlayer;
   game.currentPlayer = game.forehandPlayer;
   game.phase = 'chooseTrump';
-  game.log.push(`${game.players[game.forehandPlayer].name} hat die Rosen 7, ist Vorhand und waehlt Spielart oder schiebt.`);
+  game.log.push(isFirstRound
+    ? `${game.players[game.forehandPlayer].name} hat die Rosen 7, ist Vorhand und wählt Spielart oder schiebt.`
+    : `${game.players[game.forehandPlayer].name} ist Vorhand und wählt Spielart oder schiebt.`);
 }
 
 export function submitBid(game, playerIndex, bidValue) {
@@ -470,29 +548,42 @@ export function submitBid(game, playerIndex, bidValue) {
     throw new Error('Dieser Spieler ist nicht am Zug.');
   }
   if (!BID_VALUES.includes(bidValue)) {
-    throw new Error('Ungueltiger Gebotswert.');
+    throw new Error('Ungültiger Gebotswert.');
   }
   if (bidValue !== 0 && bidValue <= game.highestBid) {
-    throw new Error(`Gebot muss hoeher als ${game.highestBid} sein.`);
+    throw new Error(`Gebot muss höher als ${game.highestBid} sein.`);
   }
 
   const player = game.players[playerIndex];
   player.bid = bidValue;
 
-  if (bidValue > game.highestBid) {
+  if (bidValue === 0) {
+    game.biddingPassed.push(playerIndex);
+    game.log.push(`${player.name}: Pass`);
+  } else {
     game.highestBid = bidValue;
     game.highestBidder = playerIndex;
+    game.log.push(`${player.name}: bietet ${bidValue}`);
   }
 
-  game.log.push(bidValue === 0 ? `${player.name}: Pass` : `${player.name}: bietet ${bidValue}`);
+  const activeBidders = game.biddingOrder.filter((index) => !game.biddingPassed.includes(index));
 
-  game.biddingIndex += 1;
-  if (game.biddingIndex < game.biddingOrder.length) {
-    game.currentPlayer = game.biddingOrder[game.biddingIndex];
+  // Gesteigert wird, bis alle bis auf einen gepasst haben.
+  if (activeBidders.length === 0
+    || (activeBidders.length === 1 && game.highestBidder === activeBidders[0])) {
+    finishBidding(game);
     return;
   }
 
-  finishBidding(game);
+  game.currentPlayer = nextActiveBidder(game, playerIndex);
+}
+
+function nextActiveBidder(game, fromPlayerIndex) {
+  let current = nextPlayerIndex(game, fromPlayerIndex);
+  while (game.biddingPassed.includes(current)) {
+    current = nextPlayerIndex(game, current);
+  }
+  return current;
 }
 
 function finishBidding(game) {
@@ -521,14 +612,14 @@ export function canPushTrump(game) {
 
 export function pushTrumpChoice(game) {
   if (!canPushTrump(game)) {
-    throw new Error('Schieben ist aktuell nicht moeglich.');
+    throw new Error('Schieben ist aktuell nicht möglich.');
   }
 
   const partnerIndex = partnerOf(game, game.forehandPlayer);
   game.trumpWasPushed = true;
   game.chooserPlayer = partnerIndex;
   game.currentPlayer = partnerIndex;
-  game.log.push(`${game.players[game.forehandPlayer].name} schiebt. ${game.players[partnerIndex].name} waehlt die Spielart.`);
+  game.log.push(`${game.players[game.forehandPlayer].name} schiebt. ${game.players[partnerIndex].name} wählt die Spielart.`);
 }
 
 function getAnnouncementOrder(game) {
@@ -561,9 +652,22 @@ function createSequenceWeis(cards, roundMode) {
   };
 }
 
+function fourOfAKindPoints(rank) {
+  if (rank === '6' && !RULE_SET.fourSixesCount) {
+    return 0;
+  }
+  if (rank === 'under') {
+    return 200;
+  }
+  if (rank === '9') {
+    return 150;
+  }
+  return 100;
+}
+
 function createFourOfKindWeis(cards) {
   const rank = cards[0].rank;
-  const points = rank === 'under' ? 200 : rank === '9' ? 150 : 100;
+  const points = fourOfAKindPoints(rank);
 
   return {
     id: `fourOfKind:${rank}`,
@@ -593,7 +697,8 @@ export function compareWeis(first, second, roundMode) {
     return first.points > second.points ? 1 : -1;
   }
   if (first.type !== second.type) {
-    return first.type === 'sequence' ? 1 : -1;
+    const strongerType = RULE_SET.fourOfAKindBeatsSequence ? 'fourOfKind' : 'sequence';
+    return first.type === strongerType ? 1 : -1;
   }
 
   const firstRank = NATURAL_RANK_INDEX[first.relevantRank];
@@ -631,7 +736,7 @@ export function describeWeis(weis) {
   if (weis.type === 'sequence') {
     return `${weis.points}er Folge ${SUIT_LABELS[weis.suit]} ${RANK_LABELS[weis.lowRank]}-${RANK_LABELS[weis.highRank]}`;
   }
-  return `${weis.points} fuer 4x ${RANK_LABELS[weis.relevantRank]}`;
+  return `${weis.points} für 4x ${RANK_LABELS[weis.relevantRank]}`;
 }
 
 export function detectWeis(hand, roundMode = null) {
@@ -675,7 +780,8 @@ export function detectWeis(hand, roundMode = null) {
 
   const fourOfKinds = RANKS
     .filter((rank) => byRank[rank].length === 4)
-    .map((rank) => createFourOfKindWeis(byRank[rank]));
+    .map((rank) => createFourOfKindWeis(byRank[rank]))
+    .filter((weis) => weis.points > 0);
 
   return sortWeisDescending([...sequences, ...fourOfKinds], roundMode);
 }
@@ -687,13 +793,36 @@ function highestWeis(weisen, roundMode) {
 function formatModeChoice(mode, chooserName, leaderName, chooserStarts) {
   if (isTrumpMode(mode)) {
     return chooserStarts
-      ? `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]} als Trumpf und spielt aus.`
-      : `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]} als Trumpf. ${leaderName} spielt aus.`;
+      ? `${chooserName} wählt ${ROUND_MODE_LABELS[mode]} als Trumpf und spielt aus.`
+      : `${chooserName} wählt ${ROUND_MODE_LABELS[mode]} als Trumpf. ${leaderName} spielt aus.`;
   }
 
   return chooserStarts
-    ? `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]} und spielt aus.`
-    : `${chooserName} waehlt ${ROUND_MODE_LABELS[mode]}. ${leaderName} spielt aus.`;
+    ? `${chooserName} wählt ${ROUND_MODE_LABELS[mode]} und spielt aus.`
+    : `${chooserName} wählt ${ROUND_MODE_LABELS[mode]}. ${leaderName} spielt aus.`;
+}
+
+export function hasStoeck(hand, roundMode) {
+  if (!isTrumpMode(roundMode)) {
+    return false;
+  }
+  return hand.some((card) => card.suit === roundMode && card.rank === 'koenig')
+    && hand.some((card) => card.suit === roundMode && card.rank === 'ober');
+}
+
+function awardStoeck(game) {
+  const stoeckPlayer = game.players.findIndex((player) => hasStoeck(player.hand, game.roundMode));
+  game.stoeckPlayer = stoeckPlayer;
+
+  if (stoeckPlayer < 0) {
+    return;
+  }
+
+  const teamId = game.players[stoeckPlayer].teamId;
+  game.teamStoeckPoints[teamId] = RULE_SET.stoeckPoints;
+  game.log.push(
+    `${game.players[stoeckPlayer].name} hat Stöck (${SUIT_LABELS[game.roundMode]} König + Ober) und schreibt ${RULE_SET.stoeckPoints} Punkte.`
+  );
 }
 
 function startWeisPhase(game) {
@@ -721,13 +850,14 @@ function startWeisPhase(game) {
   game.phase = 'announceWeis';
   game.currentPlayer = order[0];
   game.log.push('Weisrunde beginnt.');
+  awardStoeck(game);
 }
 
 function finishWeisPhase(game) {
   const declaredEntries = game.weisState.declaredEntries.filter((entry) => entry.weis);
 
   if (declaredEntries.length === 0) {
-    game.log.push('Kein Team meldet einen gueltigen Weis.');
+    game.log.push('Kein Team meldet einen gültigen Weis.');
     game.phase = 'playing';
     game.currentPlayer = game.trickLeader;
     return;
@@ -751,6 +881,7 @@ function finishWeisPhase(game) {
   const awardedWeis = game.teams
     .find((team) => team.id === winningTeamId)
     .playerIds
+    .filter((playerIndex) => game.weisState.declaredByPlayer[playerIndex])
     .flatMap((playerIndex) => game.weisState.possibleByPlayer[playerIndex] || []);
 
   const totalWeisPoints = awardedWeis.reduce((sum, weis) => sum + weis.points, 0);
@@ -782,13 +913,23 @@ export function getPossibleWeisForPlayer(game, playerIndex) {
   return game.weisState?.possibleByPlayer?.[playerIndex] || [];
 }
 
-export function submitWeisDeclaration(game, playerIndex, selectedWeisId = null) {
+function assertWeisTurn(game, playerIndex) {
   if (game.phase !== 'announceWeis') {
     throw new Error('Nicht in der Weisrunde.');
   }
   if (playerIndex !== game.currentPlayer) {
     throw new Error('Dieser Spieler ist nicht am Zug.');
   }
+}
+
+/** Bewusster Verzicht auf die Weis-Meldung, auch wenn ein gültiger Weis auf der Hand liegt. */
+export function declineWeis(game, playerIndex) {
+  assertWeisTurn(game, playerIndex);
+  registerWeisDeclaration(game, playerIndex, null);
+}
+
+export function submitWeisDeclaration(game, playerIndex, selectedWeisId = null) {
+  assertWeisTurn(game, playerIndex);
 
   const available = getPossibleWeisForPlayer(game, playerIndex);
   let selectedWeis = null;
@@ -796,12 +937,16 @@ export function submitWeisDeclaration(game, playerIndex, selectedWeisId = null) 
   if (selectedWeisId) {
     selectedWeis = available.find((weis) => weis.id === selectedWeisId) || null;
     if (!selectedWeis) {
-      throw new Error('Dieser Weis ist fuer den Spieler nicht gueltig.');
+      throw new Error('Dieser Weis ist für den Spieler nicht gültig.');
     }
   } else {
     selectedWeis = game.weisState.highestByPlayer[playerIndex] || null;
   }
 
+  registerWeisDeclaration(game, playerIndex, selectedWeis);
+}
+
+function registerWeisDeclaration(game, playerIndex, selectedWeis) {
   game.weisState.declaredByPlayer[playerIndex] = selectedWeis;
   game.weisState.declaredEntries.push({
     playerIndex,
@@ -823,7 +968,7 @@ export function chooseTrump(game, roundMode) {
     throw new Error('Nicht in der Spielartwahl.');
   }
   if (game.currentPlayer < 0 || game.currentPlayer >= game.players.length) {
-    throw new Error('Kein gueltiger Spieler fuer die Spielartwahl.');
+    throw new Error('Kein gültiger Spieler für die Spielartwahl.');
   }
 
   const allowedModes = isSchieber(game) ? ROUND_MODE_OPTIONS : SUITS;
@@ -885,47 +1030,27 @@ function uniqueCards(cards) {
   });
 }
 
-function getBieterPlayableCards(hand, ledSuit, roundMode) {
-  if (!ledSuit) {
+/**
+ * Bedienpflicht nach den offiziellen Schweizer Jassregeln - identisch fuer alle Jassarten:
+ * - angespielte Farbe muss bedient werden
+ * - Trumpf darf jederzeit gespielt werden, auch wenn man bedienen koennte
+ * - Untertrumpfen ist verboten, ausser man haelt nur noch Trumpf
+ * - wird Trumpf angespielt, muss Trumpf bedient werden; einzige Ausnahme ist der
+ *   Puur (Trumpf-Under) als letzter verbliebener Trumpf
+ * - wer die Farbe nicht bedienen kann, darf abwerfen (es gibt keinen Trumpfzwang)
+ */
+export function getLegalCards(hand, trickCards, roundMode) {
+  if (trickCards.length === 0) {
     return [...hand];
   }
 
+  const ledSuit = trickCards[0].card.suit;
   const suited = hand.filter((card) => card.suit === ledSuit);
-  if (suited.length > 0) {
-    return suited;
+
+  if (!isTrumpMode(roundMode)) {
+    return suited.length > 0 ? suited : [...hand];
   }
 
-  const trumpSuit = isTrumpMode(roundMode) ? roundMode : null;
-  const trumps = hand.filter((card) => card.suit === trumpSuit);
-  if (trumps.length === 0) {
-    return [...hand];
-  }
-
-  const nonPuurTrumps = trumps.filter((card) => card.rank !== 'under');
-  if (nonPuurTrumps.length === 0) {
-    return [...hand];
-  }
-
-  return trumps;
-}
-
-function getNoTrumpPlayableCards(hand, trickCards) {
-  const ledSuit = trickCards.length > 0 ? trickCards[0].card.suit : null;
-  if (!ledSuit) {
-    return [...hand];
-  }
-
-  const suited = hand.filter((card) => card.suit === ledSuit);
-  return suited.length > 0 ? suited : [...hand];
-}
-
-function getSchieberTrumpPlayableCards(hand, trickCards, roundMode) {
-  const ledSuit = trickCards.length > 0 ? trickCards[0].card.suit : null;
-  if (!ledSuit) {
-    return [...hand];
-  }
-
-  const suited = hand.filter((card) => card.suit === ledSuit);
   const trumps = hand.filter((card) => card.suit === roundMode);
 
   if (ledSuit === roundMode) {
@@ -938,44 +1063,24 @@ function getSchieberTrumpPlayableCards(hand, trickCards, roundMode) {
     return trumps;
   }
 
+  const onlyTrumpsLeft = trumps.length > 0 && trumps.length === hand.length;
   const highestTrump = highestTrumpCard(trickCards, roundMode);
-  const higherTrumps = highestTrump
-    ? trumps.filter((card) => rankIndex(card, roundMode) > rankIndex(highestTrump, roundMode))
-    : trumps;
+  const playableTrumps = (!highestTrump || onlyTrumpsLeft)
+    ? trumps
+    : trumps.filter((card) => rankIndex(card, roundMode) > rankIndex(highestTrump, roundMode));
 
-  const nonTrumps = hand.filter((card) => card.suit !== roundMode);
-  const onlyTrumpsInHand = trumps.length === hand.length;
-  const onlyPuurTrump = trumps.length === 1 && trumps[0].rank === 'under';
-
-  let legal = [...suited];
-
-  if (highestTrump) {
-    if (higherTrumps.length > 0) {
-      legal = legal.concat(higherTrumps);
-    } else if (onlyTrumpsInHand || onlyPuurTrump) {
-      legal = legal.concat(trumps);
-    } else {
-      legal = legal.concat(nonTrumps);
-    }
-  } else {
-    legal = legal.concat(trumps);
+  if (suited.length > 0) {
+    return uniqueCards([...suited, ...playableTrumps]);
   }
 
-  if (legal.length === 0) {
-    return [...hand];
-  }
+  const discardable = hand.filter((card) => card.suit !== roundMode);
+  const legal = uniqueCards([...discardable, ...playableTrumps]);
 
-  return uniqueCards(legal);
+  return legal.length > 0 ? legal : [...hand];
 }
 
 export function getPlayableCards(hand, trickCards, roundMode, variantId = 'bieter') {
-  if (variantId === 'schieber') {
-    return isNoTrumpMode(roundMode)
-      ? getNoTrumpPlayableCards(hand, trickCards)
-      : getSchieberTrumpPlayableCards(hand, trickCards, roundMode);
-  }
-
-  return getBieterPlayableCards(hand, trickCards.length > 0 ? trickCards[0].card.suit : null, roundMode);
+  return getLegalCards(hand, trickCards, roundMode);
 }
 
 export function getPlayableCardsForPlayer(game, playerIndex) {
@@ -1058,6 +1163,7 @@ export function playCard(game, playerIndex, cardId) {
 
   const [card] = player.hand.splice(cardIndex, 1);
   game.trick.push({ playerIndex, card });
+  game.playedCards.push(card);
   game.log.push(`${player.name} spielt ${cardLabel(card)}.`);
 
   if (game.trick.length === game.players.length) {
@@ -1084,8 +1190,20 @@ export function getTeamWeisPoints(game, teamId) {
   return game.teamWeisScores?.[teamId] ?? 0;
 }
 
+export function getTeamStoeckPoints(game, teamId) {
+  return game.teamStoeckPoints?.[teamId] ?? 0;
+}
+
+/** Match: ein Team holt alle Stiche der Runde. */
+export function getSchieberTeamMatchPoints(game, teamId) {
+  return teamTricksWon(game, teamId) === game.variant.handSize ? RULE_SET.matchBonus : 0;
+}
+
 export function getSchieberTeamBasePoints(game, teamId) {
-  return teamTrickPoints(game, teamId) + getTeamWeisPoints(game, teamId);
+  return teamTrickPoints(game, teamId)
+    + getTeamWeisPoints(game, teamId)
+    + getTeamStoeckPoints(game, teamId)
+    + getSchieberTeamMatchPoints(game, teamId);
 }
 
 export function getSchieberTeamRoundPoints(game, teamId) {
@@ -1099,7 +1217,7 @@ export function resolveTrick(game) {
   let points = trickPoints(game.trick, game.roundMode);
 
   if (isLastTrick) {
-    points += 5;
+    points += RULE_SET.lastTrickBonus;
   }
 
   game.players[winningPlayer].tricksWon += 1;
@@ -1153,7 +1271,7 @@ function resolveBieterRound(game) {
   const defenders = game.players.filter((player) => player.id !== game.soloPlayer);
   const defenderGain = succeeded ? 0 : Math.floor(bid / defenders.length);
 
-  soloPlayer.totalScore = Math.max(0, soloPlayer.totalScore + soloGain);
+  soloPlayer.totalScore += soloGain;
   defenders.forEach((player) => {
     player.totalScore += defenderGain;
   });
@@ -1169,7 +1287,7 @@ function resolveBieterRound(game) {
   };
 
   if (succeeded) {
-    game.log.push(`${soloPlayer.name} erfuellt ${bid} und erhaelt ${soloGain} Spielpunkte.`);
+    game.log.push(`${soloPlayer.name} erfüllt ${bid} und erhält ${soloGain} Spielpunkte.`);
   } else {
     game.log.push(`${soloPlayer.name} scheitert mit ${soloPoints}/${bid} Punkten.`);
     if (defenderGain > 0) {
@@ -1208,13 +1326,17 @@ function resolveSchieberRound(game) {
   const results = game.teams.map((team) => {
     const trickPointsWon = teamTrickPoints(game, team.id);
     const weisPointsWon = getTeamWeisPoints(game, team.id);
-    const basePoints = trickPointsWon + weisPointsWon;
+    const stoeckPointsWon = getTeamStoeckPoints(game, team.id);
+    const matchPointsWon = getSchieberTeamMatchPoints(game, team.id);
+    const basePoints = trickPointsWon + weisPointsWon + stoeckPointsWon + matchPointsWon;
 
     return {
       teamId: team.id,
       name: team.name,
       trickPoints: trickPointsWon,
       weisPoints: weisPointsWon,
+      stoeckPoints: stoeckPointsWon,
+      matchPoints: matchPointsWon,
       basePoints,
       roundPoints: basePoints * multiplier,
       tricksWon: teamTricksWon(game, team.id),
@@ -1243,12 +1365,16 @@ function resolveSchieberRound(game) {
     targetScore,
     weisWinnerTeamId: game.weisState?.awardedTeamId ?? null,
     highestWeis: game.weisState?.winningDeclaration?.weis ?? null,
+    stoeckPlayer: game.stoeckPlayer,
+    matchTeamId: results.find((result) => result.matchPoints > 0)?.teamId ?? null,
   };
 
   results.forEach((result) => {
     const multiplierInfo = multiplier > 1 ? ` x${multiplier}` : '';
     const weisInfo = result.weisPoints > 0 ? ` + ${result.weisPoints} Weis` : '';
-    game.log.push(`${result.name}: ${result.trickPoints}${weisInfo} = ${result.basePoints}${multiplierInfo} -> ${result.roundPoints} Punkte.`);
+    const stoeckInfo = result.stoeckPoints > 0 ? ` + ${result.stoeckPoints} Stöck` : '';
+    const matchInfo = result.matchPoints > 0 ? ` + ${result.matchPoints} Match` : '';
+    game.log.push(`${result.name}: ${result.trickPoints}${weisInfo}${stoeckInfo}${matchInfo} = ${result.basePoints}${multiplierInfo} -> ${result.roundPoints} Punkte.`);
   });
 
   game.phase = winningTeam.totalScore >= targetScore ? 'gameOver' : 'roundEnd';
@@ -1264,72 +1390,4 @@ function resolveRound(game) {
 
 export function handValue(hand, roundMode) {
   return hand.reduce((sum, card) => sum + cardPoints(card, roundMode), 0);
-}
-
-function estimateSchieberModeValue(hand, roundMode, targetScore = 1000) {
-  const rawHandValue = handValue(hand, roundMode);
-  const possibleWeis = detectWeis(hand, roundMode);
-  const bestOwnWeis = highestWeis(possibleWeis, roundMode);
-  return (rawHandValue + (bestOwnWeis?.points ?? 0)) * getRoundMultiplier(targetScore, roundMode);
-}
-
-export function bestTrumpSuit(hand) {
-  return SUITS.reduce((bestSuit, suit) =>
-    handValue(hand, suit) > handValue(hand, bestSuit) ? suit : bestSuit
-  );
-}
-
-export function bestSchieberMode(hand, targetScore = 1000) {
-  return ROUND_MODE_OPTIONS.reduce((bestMode, currentMode) =>
-    estimateSchieberModeValue(hand, currentMode, targetScore) > estimateSchieberModeValue(hand, bestMode, targetScore)
-      ? currentMode
-      : bestMode
-  );
-}
-
-export function aiBidDecision(hand, currentHighestBid) {
-  const bestSuit = bestTrumpSuit(hand);
-  const estimatedPoints = handValue(hand, bestSuit);
-  const proposedBid = Math.min(130, Math.floor(estimatedPoints / 10) * 10);
-  if (proposedBid < 60 || proposedBid <= currentHighestBid) {
-    return 0;
-  }
-  return proposedBid;
-}
-
-function wouldWin(game, playerIndex, card) {
-  const simulated = [...game.trick, { playerIndex, card }];
-  return trickWinner(simulated, game.roundMode) === playerIndex;
-}
-
-export function aiChooseCard(game, playerIndex) {
-  const legalCards = getPlayableCardsForPlayer(game, playerIndex);
-  const byPointsAscending = (first, second) => cardPoints(first, game.roundMode) - cardPoints(second, game.roundMode);
-  const byPointsDescending = (first, second) => cardPoints(second, game.roundMode) - cardPoints(first, game.roundMode);
-  const byRankDescending = (first, second) => rankIndex(second, game.roundMode) - rankIndex(first, game.roundMode);
-
-  if (game.trick.length === 0) {
-    const trumpCards = isTrumpMode(game.roundMode)
-      ? legalCards.filter((card) => card.suit === game.roundMode)
-      : [];
-    if (trumpCards.length >= 2) {
-      return [...trumpCards].sort(byRankDescending)[0];
-    }
-    return [...legalCards].sort(byRankDescending)[0];
-  }
-
-  const currentWinner = trickWinner(game.trick, game.roundMode);
-  const teammateWinning = sameSide(game, currentWinner, playerIndex);
-  const winningCards = legalCards.filter((card) => wouldWin(game, playerIndex, card));
-
-  if (winningCards.length > 0 && !teammateWinning) {
-    return [...winningCards].sort(byPointsAscending)[0];
-  }
-  if (teammateWinning) {
-    return [...legalCards].sort(byPointsDescending)[0];
-  }
-  if (winningCards.length > 0) {
-    return [...winningCards].sort(byPointsAscending)[0];
-  }
-  return [...legalCards].sort(byPointsAscending)[0];
 }

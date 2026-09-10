@@ -36,6 +36,14 @@
         <label for="player-name">Dein Name</label>
         <input id="player-name" type="text" value="Nadinka" maxlength="18" />
 
+        <div class="setup-target-section">
+          <div class="setup-target-head">
+            <span class="setup-target-label">Schwierigkeit</span>
+            <span id="setup-difficulty-hint" class="setup-target-hint"></span>
+          </div>
+          <div id="setup-difficulty-options" class="target-picker" aria-label="Schwierigkeit wählen"></div>
+        </div>
+
         <div id="setup-target-section" class="setup-target-section hidden">
           <div class="setup-target-head">
             <span class="setup-target-label">Punkteziel im Schieber</span>
@@ -45,6 +53,8 @@
         </div>
 
         <button id="btn-start" class="btn btn-primary">Spiel starten</button>
+        <button id="btn-resume" class="btn btn-secondary hidden" type="button">Partie fortsetzen</button>
+        <div id="resume-hint" class="resume-hint hidden"></div>
       </div>
 
       <div class="setup-rules">
@@ -143,6 +153,7 @@
             <div id="weis-prompt" class="ctrl-label"></div>
             <div id="weis-list" class="weis-list"></div>
             <button id="btn-weis" class="btn btn-accent" type="button">Weis bestätigen</button>
+            <button id="btn-weis-skip" class="btn btn-secondary hidden" type="button">Nicht weisen</button>
           </div>
 
           <div id="round-end-controls" class="control-box hidden">

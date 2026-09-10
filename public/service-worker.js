@@ -1,10 +1,11 @@
-const CACHE_NAME = 'bachmann-jass-v6';
+const CACHE_NAME = 'bachmann-jass-dev';
 const CORE_ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './game-engine.js',
+  './ai.js',
   './manifest.webmanifest',
   './app-icon.svg',
   './app-icon.png',

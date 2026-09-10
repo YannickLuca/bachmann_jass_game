@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Regeln und Build pruefen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      - name: Regelengine testen
+        run: npm test
+
+      # Verhindert, dass die auf GitHub Pages ausgelieferte Version
+      # hinter public/ zurueckfaellt.
+      - name: docs/ auf Aktualitaet pruefen
+        run: npm run check:docs
