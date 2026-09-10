@@ -21,12 +21,22 @@ const publicDir = path.join(root, 'public');
 const docsDir = path.join(root, 'docs');
 const checkOnly = process.argv.includes('--check');
 
-const HASHED_FILES = ['index.html', 'style.css', 'app.js', 'game-engine.js', 'manifest.webmanifest'];
+const HASHED_FILES = [
+  'index.html',
+  'style.css',
+  'app.js',
+  'ai.js',
+  'game-engine.js',
+  'manifest.webmanifest',
+];
 
 function buildVersion() {
   const hash = crypto.createHash('sha256');
   for (const file of HASHED_FILES) {
-    hash.update(fs.readFileSync(path.join(publicDir, file)));
+    // Zeilenenden normalisieren: sonst faellt die Version unter Windows und
+    // Linux unterschiedlich aus und die CI meldet docs/ faelschlich als veraltet.
+    const content = fs.readFileSync(path.join(publicDir, file), 'utf8').split('\r\n').join('\n');
+    hash.update(content, 'utf8');
   }
   return hash.digest('hex').slice(0, 10);
 }
