@@ -362,6 +362,43 @@ function applyFanStyle(element, index, count) {
   element.style.setProperty('--fan-z', String(index + 1));
 }
 
+/**
+ * Zieht die eigene Hand so weit zusammen, dass alle Karten sichtbar bleiben.
+ * Noetig, weil ein Bieterjass-Blatt zwoelf Karten hat und auf schmalen Geraeten
+ * sonst ueber den Rand laeuft.
+ */
+function fitHumanHand(handEl) {
+  handEl.style.removeProperty('--human-hand-overlap-current');
+
+  const cards = [...handEl.children];
+  if (cards.length < 2 || handEl.clientWidth === 0) {
+    return;
+  }
+
+  const cardWidth = cards[0].getBoundingClientRect().width;
+  if (cardWidth === 0) {
+    return;
+  }
+
+  // Bis zu drei Durchgaenge: die Begrenzung auf 88 Prozent Ueberdeckung kann
+  // einen Rest offen lassen, den der naechste Durchgang aufnimmt.
+  for (let pass = 0; pass < 3; pass += 1) {
+    const overflow = handEl.scrollWidth - handEl.clientWidth;
+    if (overflow <= 0) {
+      return;
+    }
+
+    const currentMargin = Number.parseFloat(window.getComputedStyle(cards[1]).marginLeft) || 0;
+    const tightened = currentMargin - overflow / (cards.length - 1);
+    const margin = Math.max(tightened, -cardWidth * 0.88);
+
+    handEl.style.setProperty('--human-hand-overlap-current', `${margin.toFixed(2)}px`);
+    if (margin === -cardWidth * 0.88) {
+      return;
+    }
+  }
+}
+
 function isSuitBreak(hand, index) {
   return index > 0 && hand[index - 1].suit !== hand[index].suit;
 }
@@ -749,6 +786,8 @@ function renderZones() {
         applyFanStyle(element, cardIndex, player.hand.length);
         handEl.appendChild(element);
       });
+      fitHumanHand(handEl);
+      window.requestAnimationFrame(() => fitHumanHand(handEl));
       return;
     }
 
@@ -1684,6 +1723,20 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 window.addEventListener('pagehide', saveGame);
+
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  if (resizeTimer !== null) {
+    window.clearTimeout(resizeTimer);
+  }
+  resizeTimer = window.setTimeout(() => {
+    resizeTimer = null;
+    if (game) {
+      render();
+    }
+    renderSetupSpeedOptions();
+  }, 150);
+});
 
 ROUND_MODE_OPTIONS.forEach((mode) => {
   const button = document.querySelector(`.trump-btn[data-mode="${mode}"]`);

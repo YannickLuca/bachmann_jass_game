@@ -94,9 +94,21 @@ body {
 
 #screen-setup {
   display: flex;
+  /* Ohne feste Hoehe waechst der Container mit dem Inhalt, overflow-y greift
+     nie und der untere Teil wird von body { overflow: hidden } gekappt. */
+  height: 100vh;
+  height: 100dvh;
   align-items: center;
+  /* safe center: bei zu hohem Inhalt bleibt der obere Rand erreichbar,
+     statt aus dem Scrollbereich zu rutschen. */
+  align-items: safe center;
   justify-content: center;
-  padding: 1.4rem;
+  justify-content: safe center;
+  padding:
+    max(1.4rem, env(safe-area-inset-top))
+    max(1.4rem, env(safe-area-inset-right))
+    max(1.4rem, env(safe-area-inset-bottom))
+    max(1.4rem, env(safe-area-inset-left));
   background:
     radial-gradient(circle at top, rgba(72, 138, 94, 0.75), transparent 45%),
     radial-gradient(circle at bottom, rgba(213, 169, 58, 0.1), transparent 30%),
@@ -107,6 +119,7 @@ body {
 
 .setup-box {
   width: min(94vw, 620px);
+  flex-shrink: 0;
   padding: 2.4rem;
   border-radius: 28px;
   border: 1px solid var(--border);
@@ -580,6 +593,10 @@ body {
   position: relative;
   z-index: 20;
   display: flex;
+  /* In den schmalen Seitenspalten wurde das Schild gestaucht, worauf sein
+     Inhalt rechts aus dem Bild lief. */
+  flex-shrink: 0;
+  white-space: nowrap;
   align-items: center;
   gap: 0.45rem;
   padding: 0.28rem 0.6rem;
@@ -1708,7 +1725,9 @@ body {
   }
 
   .top-actions {
-    width: 100%;
+    /* Eigene Zeile erzwingen: sonst teilt sie sich die Zeile mit dem Titel,
+       wird geschrumpft und die Knopfbeschriftungen brechen auf "Jas..." ab. */
+    flex: 1 0 100%;
     min-width: 0;
     gap: 0.3rem;
     flex-wrap: wrap;
@@ -1724,13 +1743,17 @@ body {
   .top-buttons {
     order: 2;
     width: 100%;
-    gap: 0.3rem;
+    /* Eine Zeile statt zwei: die Kopfzeile belegte sonst ein Fuenftel des
+       Bildschirms. */
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 0.28rem;
   }
 
   .top-buttons .btn {
-    flex: 1 1 auto;
-    padding: 0.32rem 0.4rem;
-    font-size: 0.7rem;
+    flex: 0 0 auto;
+    padding: 0.32rem 0.5rem;
+    font-size: 0.68rem;
   }
 
   .title-wrap {

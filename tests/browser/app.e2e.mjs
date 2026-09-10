@@ -227,6 +227,61 @@ try {
     check(`Layout ohne Overflow: ${viewport.name}`, problems.length === 0, problems.join('; '));
   }
 
+  // --- Setup-Screen muss auf kleinen Geraeten scrollbar bleiben ---
+  for (const viewport of VIEWPORTS.filter((v) => v.mobile)) {
+    await page.setViewport(viewport.w, viewport.h, true);
+    await page.goto(BASE);
+    await page.evaluate('localStorage.clear(); return true;');
+    await page.goto(BASE);
+
+    const setup = await page.evaluate(`
+      const screen = document.getElementById('screen-setup');
+      const box = document.querySelector('.setup-box');
+      screen.scrollTop = 0;
+      const top = box.getBoundingClientRect().top;
+      const passtNicht = screen.scrollHeight > screen.clientHeight;
+      return {
+        erreichbar: top >= -1,
+        scrollbar: !passtNicht || screen.clientHeight < screen.scrollHeight,
+        untererRandErreichbar: screen.scrollHeight - screen.clientHeight >= 0,
+        clientHeight: screen.clientHeight,
+        viewport: window.innerHeight,
+      };
+    `);
+    check(
+      `Setup erreichbar und scrollbar: ${viewport.name}`,
+      setup.erreichbar && setup.clientHeight <= setup.viewport + 1,
+      `Container ${setup.clientHeight} in ${setup.viewport}`
+    );
+  }
+
+  // --- Bieterjass hat zwoelf Karten: die Handanpassung muss greifen ---
+  for (const viewport of VIEWPORTS.filter((v) => v.mobile)) {
+    await page.setViewport(viewport.w, viewport.h, true);
+    await startGame(page, { variant: 'bieter' });
+    await new Promise((resolve) => setTimeout(resolve, 900));
+
+    const hand = await page.evaluate(`
+      const el = document.getElementById('hand-bottom');
+      const labels = [...document.querySelectorAll('.player-label')].filter((l) => l.textContent.trim());
+      const vw = window.innerWidth;
+      return {
+        karten: el.children.length,
+        verdeckt: Math.max(0, el.scrollWidth - el.clientWidth),
+        labelsAusserhalb: labels.filter((l) => {
+          const r = l.getBoundingClientRect();
+          return r.right > vw + 1 || r.left < -1;
+        }).length,
+      };
+    `);
+    check(
+      `Bieterjass zeigt alle zwoelf Karten: ${viewport.name}`,
+      hand.karten === 12 && hand.verdeckt <= 4,
+      `${hand.karten} Karten, ${hand.verdeckt}px verdeckt`
+    );
+    check(`Namensschilder im Bild: ${viewport.name}`, hand.labelsAusserhalb === 0);
+  }
+
   check('Keine JS-Fehler im ganzen Durchlauf', page.consoleErrors.length === 0, page.consoleErrors.slice(0, 3).join(' | '));
 } finally {
   await page.close();
