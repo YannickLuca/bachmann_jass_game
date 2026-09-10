@@ -4,6 +4,9 @@ import {
   ROUND_MODE_LABELS,
   ROUND_MODE_OPTIONS,
   SCHIEBER_TARGET_SCORES,
+  BIETER_SCORINGS,
+  BIETER_SCORING_LABELS,
+  usesRoundMultipliers,
   AI_DIFFICULTIES,
   AI_DIFFICULTY_LABELS,
   RANKS,
@@ -48,8 +51,8 @@ import {
 import {
   aiBidDecision,
   aiChooseCard,
+  bestModeFrom,
   bestSchieberMode,
-  bestTrumpSuit,
   shouldPushTrump,
 } from './ai.js';
 
@@ -83,6 +86,7 @@ const DIFFICULTY_COPY = {
 
 let selectedVariantId = 'bieter';
 let selectedSchieberTargetScore = 1000;
+let selectedBieterScoring = 'einfach';
 let selectedDifficulty = 'normal';
 let selectedSpeed = 'normal';
 let game = null;
@@ -102,6 +106,9 @@ const setupDifficultyOptions = document.getElementById('setup-difficulty-options
 const setupDifficultyHint = document.getElementById('setup-difficulty-hint');
 const setupSpeedOptions = document.getElementById('setup-speed-options');
 const setupSpeedHint = document.getElementById('setup-speed-hint');
+const setupScoringSection = document.getElementById('setup-scoring-section');
+const setupScoringOptions = document.getElementById('setup-scoring-options');
+const setupScoringHint = document.getElementById('setup-scoring-hint');
 const btnRulesSetup = document.getElementById('btn-rules-setup');
 const variantCards = [...document.querySelectorAll('.variant-card')];
 const playerNameInput = document.getElementById('player-name');
@@ -230,6 +237,7 @@ function saveSettings() {
     playerName: playerNameInput.value.trim(),
     variantId: selectedVariantId,
     targetScore: selectedSchieberTargetScore,
+    scoring: selectedBieterScoring,
     difficulty: selectedDifficulty,
     speed: selectedSpeed,
   })));
@@ -255,6 +263,9 @@ function restoreSettings() {
   }
   if (SPEED_ORDER.includes(settings.speed)) {
     selectedSpeed = settings.speed;
+  }
+  if (BIETER_SCORINGS.includes(settings.scoring)) {
+    selectedBieterScoring = settings.scoring;
   }
 }
 
@@ -568,6 +579,38 @@ function describeMultipliers() {
     .join(', ');
 }
 
+const SCORING_COPY = {
+  einfach: 'Nur die vier Farben, alles zählt einfach.',
+  schieber: 'Alle Spielarten inklusive Slalom, mit Multiplikatoren.',
+};
+
+function renderSetupScoringOptions() {
+  if (selectedVariantId !== 'bieter') {
+    setupScoringSection.classList.add('hidden');
+    return;
+  }
+
+  setupScoringSection.classList.remove('hidden');
+  setupScoringOptions.innerHTML = BIETER_SCORINGS.map((scoring) => {
+    const active = selectedBieterScoring === scoring;
+    return `
+      <button
+        type="button"
+        class="target-card${active ? ' active' : ''}"
+        data-scoring="${scoring}"
+        aria-pressed="${active ? 'true' : 'false'}"
+      >
+        <span class="target-title">${escapeHtml(BIETER_SCORING_LABELS[scoring])}</span>
+        <span class="target-copy">${escapeHtml(SCORING_COPY[scoring])}</span>
+      </button>
+    `;
+  }).join('');
+
+  setupScoringHint.textContent = selectedBieterScoring === 'schieber'
+    ? describeMultipliers()
+    : 'Jedes Gebot zählt so, wie es geboten wurde.';
+}
+
 function renderSetupTargetOptions() {
   if (selectedVariantId !== 'schieber') {
     setupTargetSection.classList.add('hidden');
@@ -632,11 +675,17 @@ function setSetupVariant(variantId) {
   if (variantId === 'schieber') {
     rules.push(`Aktuelle Setup-Wahl: ${selectedSchieberTargetScore} Punkte.`);
   }
+  if (variantId === 'bieter') {
+    rules.push(selectedBieterScoring === 'schieber'
+      ? `Aktuelle Setup-Wahl: wie im Schieber. ${describeMultipliers()}`
+      : 'Aktuelle Setup-Wahl: einfache Zählweise, nur die vier Farben.');
+  }
   setupRulesList.innerHTML = rules
     .map((rule) => `<li>${escapeHtml(rule)}</li>`)
     .join('');
 
   renderSetupTargetOptions();
+  renderSetupScoringOptions();
   renderSetupDifficultyOptions();
   renderSetupSpeedOptions();
 }
@@ -1071,9 +1120,16 @@ function renderRoundSummary() {
       .map((player) => player.name)
       .join(' & ');
 
+    const bieterMultiplier = game.roundSummary.multiplier > 1
+      ? ` x${game.roundSummary.multiplier}`
+      : '';
+    const bieterMode = game.roundSummary.roundMode
+      ? `<strong>Spielart:</strong> ${escapeHtml(getRoundModeLabel(game.roundSummary.roundMode))}${bieterMultiplier}<br>`
+      : '';
+
     roundEndMsg.innerHTML = game.roundSummary.succeeded
-      ? `<strong>${escapeHtml(soloPlayer.name)}</strong> erfüllt ${game.roundSummary.bid}.<br>${game.roundSummary.soloPoints} Punkte in der Runde, +${game.roundSummary.soloGain} Spielpunkte.`
-      : `<strong>${escapeHtml(soloPlayer.name)}</strong> scheitert mit ${game.roundSummary.soloPoints}/${game.roundSummary.bid}.<br>${escapeHtml(soloPlayer.name)}: ${game.roundSummary.soloGain} Spielpunkte.<br>${escapeHtml(defenderNames)}: je +${game.roundSummary.defenderGain} Spielpunkte.`;
+      ? `${bieterMode}<strong>${escapeHtml(soloPlayer.name)}</strong> erfüllt ${game.roundSummary.bid}.<br>${game.roundSummary.soloPoints} Punkte in der Runde, +${game.roundSummary.soloGain} Spielpunkte.`
+      : `${bieterMode}<strong>${escapeHtml(soloPlayer.name)}</strong> scheitert mit ${game.roundSummary.soloPoints}/${game.roundSummary.bid}.<br>${escapeHtml(soloPlayer.name)}: ${game.roundSummary.soloGain} Spielpunkte.<br>${escapeHtml(defenderNames)}: je +${game.roundSummary.defenderGain} Spielpunkte.`;
     return;
   }
 
@@ -1217,6 +1273,7 @@ function renderBieterScoreboard(history) {
     <tr>
       <td>${entry.roundNumber}</td>
       <td>${escapeHtml(game.players[entry.soloPlayer].name)}</td>
+      <td>${escapeHtml(getRoundModeLabel(entry.roundMode))}${entry.multiplier > 1 ? ` x${entry.multiplier}` : ''}</td>
       <td>${entry.bid}</td>
       <td>${entry.soloPoints}</td>
       <td>${entry.succeeded ? 'erfüllt' : 'verpasst'}</td>
@@ -1235,6 +1292,7 @@ function renderBieterScoreboard(history) {
           <tr>
             <th>Runde</th>
             <th>Bieter</th>
+            <th>Spielart</th>
             <th>Gebot</th>
             <th>Erreicht</th>
             <th>Ergebnis</th>
@@ -1243,7 +1301,7 @@ function renderBieterScoreboard(history) {
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
-          <tr><td colspan="6">${totals}</td></tr>
+          <tr><td colspan="7">${totals}</td></tr>
         </tfoot>
       </table>
     </div>
@@ -1469,17 +1527,21 @@ function gameLoop() {
 
   if (game.phase === 'chooseTrump' && !currentPlayer.isHuman) {
     queueAiAction(randomDelay(AI_DELAYS.trump), () => {
-      if (canPushTrump(game) && shouldPushTrump(currentPlayer.hand, getGameTargetScore(game))) {
+      if (canPushTrump(game) && shouldPushTrump(currentPlayer.hand)) {
         pushTrumpChoice(game);
         return;
       }
 
       if (isSchieber(game)) {
-        chooseTrump(game, bestSchieberMode(currentPlayer.hand, getGameTargetScore(game)));
+        chooseTrump(game, bestSchieberMode(currentPlayer.hand));
         return;
       }
 
-      chooseTrump(game, bestTrumpSuit(currentPlayer.hand));
+      chooseTrump(game, bestModeFrom(
+        currentPlayer.hand,
+        getAllowedRoundModes(game),
+        { multipliers: usesRoundMultipliers(game) }
+      ));
     });
     return;
   }
@@ -1532,7 +1594,7 @@ function startSelectedGame() {
   const playerName = playerNameInput.value.trim() || 'Du';
   const matchConfig = selectedVariantId === 'schieber'
     ? { targetScore: selectedSchieberTargetScore, difficulty: selectedDifficulty }
-    : { difficulty: selectedDifficulty };
+    : { difficulty: selectedDifficulty, scoring: selectedBieterScoring };
 
   saveSettings();
   clearSavedGame();
@@ -1564,6 +1626,16 @@ variantCards.forEach((card) => {
   card.addEventListener('click', () => {
     setSetupVariant(card.dataset.variant);
   });
+});
+
+setupScoringOptions.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-scoring]');
+  if (!button) {
+    return;
+  }
+
+  selectedBieterScoring = button.dataset.scoring;
+  setSetupVariant(selectedVariantId);
 });
 
 setupSpeedOptions.addEventListener('click', (event) => {

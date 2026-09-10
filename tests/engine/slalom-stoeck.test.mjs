@@ -11,6 +11,7 @@ import {
   getPlayableCardsForPlayer,
   getRoundMultiplier,
   getTrickMode,
+  getAllowedRoundModes,
   hasStoeck,
   playCard,
   rankIndex,
@@ -18,8 +19,10 @@ import {
   setRandomSeed,
   startNextTrick,
   startRound,
+  submitBid,
   submitWeisDeclaration,
   trickWinner,
+  usesRoundMultipliers,
 } from '../../public/game-engine.js';
 import { aiChooseCard } from '../../public/ai.js';
 
@@ -214,4 +217,79 @@ test('Ein Weis mit beiden Stöck-Karten sagt das Stöck gleich mit an', () => {
     game.log.some((line) => line.includes('Stöck') && line.includes('Weis')),
     'Das Protokoll soll den Grund nennen'
   );
+});
+
+/* ---------- Zaehlweise im Bieterjass ---------- */
+
+test('Bieterjass einfach: nur die vier Farben, alles zaehlt einfach', () => {
+  const game = createGame({ variantId: 'bieter', matchConfig: { scoring: 'einfach' } });
+
+  assert.deepEqual(getAllowedRoundModes(game), ['eicheln', 'rosen', 'schellen', 'schilten']);
+  assert.equal(usesRoundMultipliers(game), false);
+
+  game.roundMode = 'schellen';
+  assert.equal(getRoundMultiplier(game), 1, 'Schellen zaehlt hier nicht doppelt');
+  game.roundMode = 'obeAbe';
+  assert.equal(getRoundMultiplier(game), 1);
+});
+
+test('Bieterjass wie im Schieber: alle Spielarten und Multiplikatoren', () => {
+  const game = createGame({ variantId: 'bieter', matchConfig: { scoring: 'schieber' } });
+
+  assert.deepEqual(
+    getAllowedRoundModes(game),
+    ['eicheln', 'rosen', 'schellen', 'schilten', 'obeAbe', 'uneUfe', 'slalom']
+  );
+  assert.equal(usesRoundMultipliers(game), true);
+
+  game.roundMode = 'rosen';
+  assert.equal(getRoundMultiplier(game), 1);
+  game.roundMode = 'schilten';
+  assert.equal(getRoundMultiplier(game), 2);
+  game.roundMode = 'slalom';
+  assert.equal(getRoundMultiplier(game), 3);
+});
+
+test('Der Multiplikator wirkt im Bieterjass auf die Spielpunkte, nicht auf das Gebot', () => {
+  const spiele = (scoring, roundMode) => {
+    setRandomSeed(77);
+    const game = createGame({ variantId: 'bieter', matchConfig: { scoring } });
+    startRound(game);
+
+    // Erster Bieter nimmt 100, die anderen passen.
+    const [first, second, third] = game.biddingOrder;
+    submitBid(game, first, 100);
+    submitBid(game, second, 0);
+    submitBid(game, third, 0);
+    chooseTrump(game, roundMode);
+
+    // Runde durchspielen.
+    for (let trick = 0; trick < game.variant.handSize; trick += 1) {
+      for (let seat = 0; seat < game.players.length; seat += 1) {
+        const playerIndex = game.currentPlayer;
+        if (playCard(game, playerIndex, aiChooseCard(game, playerIndex).id)) {
+          resolveTrick(game);
+        }
+      }
+      if (game.phase === 'trickEnd') {
+        startNextTrick(game);
+      }
+    }
+    setRandomSeed(null);
+    return game.roundSummary;
+  };
+
+  const einfach = spiele('einfach', 'schilten');
+  const wieSchieber = spiele('schieber', 'schilten');
+
+  assert.equal(einfach.bid, 100, 'Geboten wird in Stichpunkten');
+  assert.equal(wieSchieber.bid, 100, 'Das Gebot bleibt gleich');
+  assert.equal(einfach.multiplier, 1);
+  assert.equal(wieSchieber.multiplier, 2, 'Schilten zaehlt doppelt');
+  assert.equal(
+    Math.abs(wieSchieber.soloGain),
+    Math.abs(einfach.soloGain) * 2,
+    'Die Spielpunkte verdoppeln sich'
+  );
+  assert.equal(einfach.soloPoints, wieSchieber.soloPoints, 'Gleiche Karten, gleiche Stichpunkte');
 });

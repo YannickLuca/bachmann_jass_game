@@ -134,9 +134,21 @@ function estimateRoundPoints(evaluation) {
  * Der Multiplikator vervielfacht die Punkte beider Teams, also zaehlt er auf die
  * Differenz - nicht auf die erwartete Punktzahl.
  */
-export function modeAdvantage(hand, roundMode, targetScore = 1000) {
+export function modeAdvantage(hand, roundMode, options = null) {
   const estimate = estimateRoundPoints(evaluateRoundMode(hand, roundMode));
-  return (estimate - HALF_ROUND_POINTS) * getRoundMultiplier(targetScore, roundMode);
+  // Zaehlt die Partie ohne Multiplikatoren (einfacher Bieterjass), wirkt nur
+  // die reine Erwartung.
+  const multiplier = options && options.multipliers === false
+    ? 1
+    : getRoundMultiplier(roundMode);
+
+  return (estimate - HALF_ROUND_POINTS) * multiplier;
+}
+
+/** Beste Spielart aus einer vorgegebenen Auswahl. */
+export function bestModeFrom(hand, allowedModes, options = null) {
+  return allowedModes.reduce((best, mode) =>
+    modeAdvantage(hand, mode, options) > modeAdvantage(hand, best, options) ? mode : best);
 }
 
 export function bestTrumpSuit(hand) {
@@ -145,15 +157,13 @@ export function bestTrumpSuit(hand) {
   );
 }
 
-export function bestSchieberMode(hand, targetScore = 1000) {
-  return ROUND_MODE_OPTIONS.reduce((best, mode) =>
-    modeAdvantage(hand, mode, targetScore) > modeAdvantage(hand, best, targetScore) ? mode : best
-  );
+export function bestSchieberMode(hand) {
+  return bestModeFrom(hand, ROUND_MODE_OPTIONS);
 }
 
 /** Geschoben wird, wenn die eigene Hand keinen Vorteil verspricht. */
-export function shouldPushTrump(hand, targetScore = 1000) {
-  return modeAdvantage(hand, bestSchieberMode(hand, targetScore), targetScore) <= 0;
+export function shouldPushTrump(hand) {
+  return modeAdvantage(hand, bestSchieberMode(hand)) <= 0;
 }
 
 export function aiBidDecision(hand, currentHighestBid) {

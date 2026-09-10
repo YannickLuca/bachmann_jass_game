@@ -132,6 +132,12 @@ try {
   });
   check('Setup-Text und Regel-Screen nennen dieselben Multiplikatoren', drift.length === 0, drift.join(', '));
 
+  // --- Zaehlweise im Bieterjass (M: eigene Wahl) ---
+  await page.click('.variant-card[data-variant="bieter"]');
+  check('Zaehlweise steht nur im Bieterjass zur Wahl', await page.visible('#setup-scoring-section'));
+  await page.click('.variant-card[data-variant="schieber"]');
+  check('Im Schieber ist sie ausgeblendet', !(await page.visible('#setup-scoring-section')));
+
   // --- Partie und Bedienung ---
   await startGame(page);
   check('Tempo-Knopf spiegelt die Wahl (M4.2)', (await page.text('#btn-speed')) === 'Tempo: Schnell');

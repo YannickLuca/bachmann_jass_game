@@ -18,6 +18,16 @@ export const ROUND_MODE_LABELS = {
 };
 
 export const SCHIEBER_TARGET_SCORES = [1000, 2500];
+
+/**
+ * Im Bieterjass waehlbar: entweder wie im Schieber mit allen Spielarten und
+ * Multiplikatoren, oder einfach mit den vier Farben und einfacher Zaehlung.
+ */
+export const BIETER_SCORINGS = ['einfach', 'schieber'];
+export const BIETER_SCORING_LABELS = {
+  einfach: 'Einfach',
+  schieber: 'Wie im Schieber',
+};
 export const AI_DIFFICULTIES = ['einfach', 'normal', 'schwer'];
 export const AI_DIFFICULTY_LABELS = {
   einfach: 'Einfach',
@@ -140,9 +150,10 @@ export const GAME_VARIANTS = {
     rules: [
       '36 Karten (6 bis Ass), 12 Karten pro Spieler, in 3er-Paketen verteilt.',
       'Es wird gesteigert, bis alle bis auf einen passen. Der Höchstbietende spielt alleine gegen die anderen zwei.',
-      'Der Höchstbietende wählt die Trumpffarbe.',
+      'Der Höchstbietende wählt die Spielart.',
+      'Zählweise wählbar: einfach mit den vier Farben, oder wie im Schieber mit allen Spielarten und Multiplikatoren.',
       'Bedienpflicht nach offiziellen Schweizer Regeln: Farbe bedienen, kein Trumpfzwang, kein Untertrumpfen.',
-      'Erfüllt der Bieter sein Gebot, erhält er den Gebotswert. Sonst verliert er ihn.',
+      'Erfüllt der Bieter sein Gebot, erhält er den Gebotswert. Sonst verliert er ihn. Der Multiplikator wirkt auf die Spielpunkte, nicht auf das Gebot.',
       'Ziel: zuerst 1500 Spielpunkte erreichen.',
     ],
   },
@@ -213,6 +224,10 @@ export function normalizeDifficulty(difficulty) {
   return AI_DIFFICULTIES.includes(difficulty) ? difficulty : 'normal';
 }
 
+export function normalizeBieterScoring(scoring) {
+  return BIETER_SCORINGS.includes(scoring) ? scoring : 'einfach';
+}
+
 function normalizeMatchConfig(variantId, matchConfig = {}) {
   const difficulty = normalizeDifficulty(matchConfig.difficulty);
 
@@ -220,6 +235,7 @@ function normalizeMatchConfig(variantId, matchConfig = {}) {
     return {
       targetScore: GAME_VARIANTS[variantId].targetScore,
       difficulty,
+      scoring: normalizeBieterScoring(matchConfig.scoring),
     };
   }
 
@@ -233,6 +249,16 @@ export function getGameDifficulty(game) {
   return normalizeDifficulty(game.matchConfig?.difficulty);
 }
 
+/** Nur im Bieterjass relevant: 'einfach' oder 'schieber'. */
+export function getBieterScoring(game) {
+  return normalizeBieterScoring(game.matchConfig?.scoring);
+}
+
+/** Zaehlen in dieser Partie die Spielart-Multiplikatoren? */
+export function usesRoundMultipliers(game) {
+  return isSchieber(game) || getBieterScoring(game) === 'schieber';
+}
+
 export function getGameTargetScore(game) {
   return game.matchConfig?.targetScore ?? game.variant.targetScore;
 }
@@ -242,6 +268,11 @@ export function getGameTargetScore(game) {
  * wie im 2500er. Der Zielscore bestimmt nur die Laenge der Partie.
  */
 export function getRoundMultiplier(gameOrRoundMode, maybeRoundMode = null) {
+  const isGame = gameOrRoundMode && typeof gameOrRoundMode === 'object';
+  if (isGame && !usesRoundMultipliers(gameOrRoundMode)) {
+    return 1;
+  }
+
   const roundMode = typeof gameOrRoundMode === 'string'
     ? gameOrRoundMode
     : (typeof gameOrRoundMode === 'number' ? maybeRoundMode : gameOrRoundMode?.roundMode);
@@ -1014,7 +1045,10 @@ function registerWeisDeclaration(game, playerIndex, selectedWeis) {
 
 /** Im Bieterjass wird nur eine Trumpffarbe gewaehlt, im Schieber alle Spielarten. */
 export function getAllowedRoundModes(game) {
-  return isSchieber(game) ? ROUND_MODE_OPTIONS : [...SUITS];
+  if (isSchieber(game) || getBieterScoring(game) === 'schieber') {
+    return [...ROUND_MODE_OPTIONS];
+  }
+  return [...SUITS];
 }
 
 export function chooseTrump(game, roundMode) {
@@ -1320,9 +1354,13 @@ function resolveBieterRound(game) {
   const bid = game.highestBid;
   const soloPoints = soloPlayer.pointsWon;
   const succeeded = soloPoints >= bid;
-  const soloGain = succeeded ? bid : -bid;
+  // Geboten wird in Stichpunkten. Der Multiplikator wirkt auf die Spielpunkte,
+  // die daraus werden - nicht auf das Gebot selbst.
+  const multiplier = getRoundMultiplier(game);
+  const stake = bid * multiplier;
+  const soloGain = succeeded ? stake : -stake;
   const defenders = game.players.filter((player) => player.id !== game.soloPlayer);
-  const defenderGain = succeeded ? 0 : Math.floor(bid / defenders.length);
+  const defenderGain = succeeded ? 0 : Math.floor(stake / defenders.length);
 
   soloPlayer.totalScore += soloGain;
   defenders.forEach((player) => {
@@ -1337,10 +1375,13 @@ function resolveBieterRound(game) {
     succeeded,
     soloGain,
     defenderGain,
+    roundMode: game.roundMode,
+    multiplier,
   };
 
+  const multiplierInfo = multiplier > 1 ? ` (${bid} x${multiplier})` : '';
   if (succeeded) {
-    game.log.push(`${soloPlayer.name} erfüllt ${bid} und erhält ${soloGain} Spielpunkte.`);
+    game.log.push(`${soloPlayer.name} erfüllt ${bid} und erhält ${soloGain} Spielpunkte${multiplierInfo}.`);
   } else {
     game.log.push(`${soloPlayer.name} scheitert mit ${soloPoints}/${bid} Punkten.`);
     if (defenderGain > 0) {

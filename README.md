@@ -77,7 +77,11 @@ Bieterjass ist **keine offizielle Schweizer Jassart**, sondern eine Hausvariante
 - 36 Karten, 12 Karten pro Spieler
 - gesteigert wird reihum, bis alle bis auf einen gepasst haben
 - passen alle, spielt der Geber mit 60
-- der Höchstbietende wählt die Trumpffarbe und spielt alleine gegen die anderen zwei
+- der Höchstbietende wählt die Spielart und spielt alleine gegen die anderen zwei
+- die Zählweise ist im Setup wählbar:
+  - **Einfach**: nur die vier Trumpffarben, alles zählt einfach
+  - **Wie im Schieber**: alle Spielarten inklusive Slalom, mit den Multiplikatoren aus der Tabelle oben
+- geboten wird immer in Stichpunkten. Der Multiplikator wirkt auf die Spielpunkte, die daraus werden, nicht auf das Gebot
 - erfüllt er sein Gebot, erhält er den Gebotswert, sonst wird er ihm abgezogen; die Verteidiger teilen sich den Gebotswert
 - kein Weis, kein Stöck, kein Match
 - Ziel: 1500 Spielpunkte
