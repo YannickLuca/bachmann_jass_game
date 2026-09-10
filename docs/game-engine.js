@@ -93,7 +93,7 @@ const HAND_SUIT_INDEX = Object.fromEntries(HAND_SUIT_ORDER.map((suit, index) => 
 const HAND_RANK_INDEX = Object.fromEntries(BASE_ORDER.map((rank, index) => [rank, index]));
 const NATURAL_RANK_INDEX = Object.fromEntries(BASE_ORDER.map((rank, index) => [rank, index]));
 const SCHIEBER_START_CARD_ID = 'rosen_7';
-const SEQUENCE_POINTS = {
+export const SEQUENCE_POINTS = {
   3: 20,
   4: 50,
   5: 100,
@@ -400,6 +400,7 @@ export function createGame({ variantId = 'bieter', playerName = 'Du', matchConfi
     weisState: null,
     log: [],
     roundSummary: null,
+    roundHistory: [],
     roundNumber: 0,
   };
 }
@@ -652,7 +653,7 @@ function createSequenceWeis(cards, roundMode) {
   };
 }
 
-function fourOfAKindPoints(rank) {
+export function fourOfAKindPoints(rank) {
   if (rank === '6' && !RULE_SET.fourSixesCount) {
     return 0;
   }
@@ -1380,12 +1381,34 @@ function resolveSchieberRound(game) {
   game.phase = winningTeam.totalScore >= targetScore ? 'gameOver' : 'roundEnd';
 }
 
+/** Haelt die abgeschlossene Runde fuer die Jasstafel fest. */
+function recordRoundHistory(game) {
+  if (!game.roundSummary) {
+    return;
+  }
+
+  const entry = {
+    ...game.roundSummary,
+    roundNumber: game.roundNumber,
+    dealer: game.dealer,
+  };
+
+  if (isSchieber(game)) {
+    entry.totals = Object.fromEntries(game.teams.map((team) => [team.id, team.totalScore]));
+  } else {
+    entry.totals = Object.fromEntries(game.players.map((player) => [player.id, player.totalScore]));
+  }
+
+  game.roundHistory.push(entry);
+}
+
 function resolveRound(game) {
   if (isBieter(game)) {
     resolveBieterRound(game);
-    return;
+  } else {
+    resolveSchieberRound(game);
   }
-  resolveSchieberRound(game);
+  recordRoundHistory(game);
 }
 
 export function handValue(hand, roundMode) {

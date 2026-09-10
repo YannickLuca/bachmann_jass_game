@@ -227,6 +227,16 @@ async function connectToPage(webSocketDebuggerUrl) {
   page.waitFor = (expression, options = {}) =>
     waitFor(() => page.evaluate(`return Boolean(${expression});`), options);
 
+  page.setViewport = async (width, height, mobile = false) => {
+    await send('Emulation.setDeviceMetricsOverride', {
+      width,
+      height,
+      deviceScaleFactor: 1,
+      mobile,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  };
+
   page.screenshot = async (filePath) => {
     const { data } = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(filePath, Buffer.from(data, 'base64'));

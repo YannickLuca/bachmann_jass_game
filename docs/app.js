@@ -6,7 +6,14 @@ import {
   SCHIEBER_TARGET_SCORES,
   AI_DIFFICULTIES,
   AI_DIFFICULTY_LABELS,
+  RANKS,
+  RANK_LABELS,
+  RULE_SET,
+  SEQUENCE_POINTS,
+  fourOfAKindPoints,
+  partnerOf,
   cardImagePath,
+  cardPoints,
   cardLabel,
   createGame,
   startRound,
@@ -57,6 +64,15 @@ const AI_DELAYS = {
   trickEnd: [1700, 2500],
 };
 
+const SPEED_FACTORS = { langsam: 1.5, normal: 1, schnell: 0.45 };
+const SPEED_LABELS = { langsam: 'Langsam', normal: 'Normal', schnell: 'Schnell' };
+const SPEED_ORDER = ['langsam', 'normal', 'schnell'];
+const SPEED_COPY = {
+  langsam: 'Viel Zeit, jeden Zug in Ruhe mitlesen.',
+  normal: 'Ausgewogenes Tempo.',
+  schnell: 'Zügig. Ein Tipp auf den Tisch überspringt zusätzlich jede Wartezeit.',
+};
+
 const DIFFICULTY_COPY = {
   einfach: 'Spielt geradeaus, ohne Plan. Gut zum Reinkommen.',
   normal: 'Zieht Trumpf, schmiert dem Partner und sticht sparsam.',
@@ -66,9 +82,12 @@ const DIFFICULTY_COPY = {
 let selectedVariantId = 'bieter';
 let selectedSchieberTargetScore = 1000;
 let selectedDifficulty = 'normal';
+let selectedSpeed = 'normal';
 let game = null;
 let aiLocked = false;
 let animatedTrickCards = new Set();
+let pendingAiAction = null;
+let pendingAiTimeout = null;
 
 const screenSetup = document.getElementById('screen-setup');
 const screenGame = document.getElementById('screen-game');
@@ -79,6 +98,9 @@ const setupTargetOptions = document.getElementById('setup-target-options');
 const setupTargetHint = document.getElementById('setup-target-hint');
 const setupDifficultyOptions = document.getElementById('setup-difficulty-options');
 const setupDifficultyHint = document.getElementById('setup-difficulty-hint');
+const setupSpeedOptions = document.getElementById('setup-speed-options');
+const setupSpeedHint = document.getElementById('setup-speed-hint');
+const btnRulesSetup = document.getElementById('btn-rules-setup');
 const variantCards = [...document.querySelectorAll('.variant-card')];
 const playerNameInput = document.getElementById('player-name');
 const btnStart = document.getElementById('btn-start');
@@ -111,6 +133,15 @@ const gameOverControls = document.getElementById('game-over-controls');
 const gameOverMsg = document.getElementById('game-over-msg');
 const btnNewGame = document.getElementById('btn-new-game');
 const btnHome = document.getElementById('btn-home');
+const btnSpeed = document.getElementById('btn-speed');
+const btnScoreboard = document.getElementById('btn-scoreboard');
+const btnRules = document.getElementById('btn-rules');
+const scoreboard = document.getElementById('scoreboard');
+const scoreboardBody = document.getElementById('scoreboard-body');
+const btnCloseScoreboard = document.getElementById('btn-close-scoreboard');
+const rulesSheet = document.getElementById('rules-sheet');
+const rulesSheetBody = document.getElementById('rules-sheet-body');
+const btnCloseRules = document.getElementById('btn-close-rules');
 const trickReview = document.getElementById('trick-review');
 const trickReviewText = document.getElementById('trick-review-text');
 const trickReviewCards = document.getElementById('trick-review-cards');
@@ -198,6 +229,7 @@ function saveSettings() {
     variantId: selectedVariantId,
     targetScore: selectedSchieberTargetScore,
     difficulty: selectedDifficulty,
+    speed: selectedSpeed,
   })));
 }
 
@@ -218,6 +250,9 @@ function restoreSettings() {
   }
   if (AI_DIFFICULTIES.includes(settings.difficulty)) {
     selectedDifficulty = settings.difficulty;
+  }
+  if (SPEED_ORDER.includes(settings.speed)) {
+    selectedSpeed = settings.speed;
   }
 }
 
@@ -268,11 +303,17 @@ function getPlayerBadge(playerIndex) {
 
   if (isBieter(game)) {
     if (player.bid === null) {
-      return '';
+      return playerIndex === game.dealer ? 'Geber' : '';
     }
     return player.bid === 0 ? 'Pass' : String(player.bid);
   }
 
+  if (playerIndex === game.dealer) {
+    return 'Geber';
+  }
+  if (playerIndex === partnerOf(game, 0)) {
+    return 'Partner';
+  }
   return '';
 }
 
@@ -283,12 +324,21 @@ function cardBackEl() {
 }
 
 function cardFaceEl(card, isPlayable, onClick) {
-  const element = document.createElement('div');
+  const element = document.createElement('button');
+  element.type = 'button';
   element.className = `card card-face${isPlayable ? ' playable' : ''}`;
+  element.setAttribute(
+    'aria-label',
+    onClick ? `${cardLabel(card)} spielen` : `${cardLabel(card)}${isPlayable ? '' : ' - nicht spielbar'}`
+  );
+
+  if (!onClick) {
+    element.disabled = true;
+  }
 
   const image = document.createElement('img');
   image.src = cardImagePath(card);
-  image.alt = cardLabel(card);
+  image.alt = '';
   image.draggable = false;
   element.appendChild(image);
 
@@ -415,6 +465,12 @@ function closeTrickReview() {
   trickReviewCards.innerHTML = '';
 }
 
+function closeAllDialogs() {
+  closeTrickReview();
+  closeScoreboard();
+  closeRulesSheet();
+}
+
 function openFirstTrickReview(pileId) {
   if (!game?.firstCapturedTrick) {
     msgEl.textContent = 'Nach dem ersten Stich kannst du ihn hier nochmals ansehen.';
@@ -524,6 +580,7 @@ function setSetupVariant(variantId) {
 
   renderSetupTargetOptions();
   renderSetupDifficultyOptions();
+  renderSetupSpeedOptions();
 }
 
 function applyVariantClasses() {
@@ -1016,6 +1073,197 @@ function renderGameOver() {
   `;
 }
 
+function scoreboardTags(entry) {
+  const tags = [];
+  if (entry.weisWinnerTeamId !== null && entry.weisWinnerTeamId !== undefined) {
+    tags.push('Weis');
+  }
+  if (entry.stoeckPlayer >= 0) {
+    tags.push('Stöck');
+  }
+  if (entry.matchTeamId !== null && entry.matchTeamId !== undefined) {
+    tags.push('Match');
+  }
+  return tags.map((tag) => `<span class="scoreboard-tag">${tag}</span>`).join('');
+}
+
+function renderSchieberScoreboard(history) {
+  const rows = history.map((entry) => {
+    const own = entry.results.find((result) => result.teamId === 0);
+    const enemy = entry.results.find((result) => result.teamId === 1);
+    const multiplier = entry.multiplier > 1 ? ` x${entry.multiplier}` : '';
+
+    return `
+      <tr>
+        <td>${entry.roundNumber}</td>
+        <td>${escapeHtml(getRoundModeLabel(entry.roundMode))}${multiplier}${scoreboardTags(entry)}</td>
+        <td>${own.roundPoints}</td>
+        <td>${enemy.roundPoints}</td>
+        <td>${entry.totals[0]}</td>
+        <td>${entry.totals[1]}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="scoreboard-scroll">
+      <table class="scoreboard-table">
+        <thead>
+          <tr>
+            <th>Runde</th>
+            <th>Spielart</th>
+            <th>${escapeHtml(game.teams[0].name)}</th>
+            <th>${escapeHtml(game.teams[1].name)}</th>
+            <th>Total</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4">Ziel ${getGameTargetScore(game)}</td>
+            <td>${game.teams[0].totalScore}</td>
+            <td>${game.teams[1].totalScore}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function renderBieterScoreboard(history) {
+  const rows = history.map((entry) => `
+    <tr>
+      <td>${entry.roundNumber}</td>
+      <td>${escapeHtml(game.players[entry.soloPlayer].name)}</td>
+      <td>${entry.bid}</td>
+      <td>${entry.soloPoints}</td>
+      <td>${entry.succeeded ? 'erfüllt' : 'verpasst'}</td>
+      <td>${entry.soloGain > 0 ? '+' : ''}${entry.soloGain}</td>
+    </tr>
+  `).join('');
+
+  const totals = game.players
+    .map((player) => `${escapeHtml(player.name)}: ${player.totalScore}`)
+    .join(' | ');
+
+  return `
+    <div class="scoreboard-scroll">
+      <table class="scoreboard-table">
+        <thead>
+          <tr>
+            <th>Runde</th>
+            <th>Bieter</th>
+            <th>Gebot</th>
+            <th>Erreicht</th>
+            <th>Ergebnis</th>
+            <th>Punkte</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr><td colspan="6">${totals}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function openScoreboard() {
+  const history = game?.roundHistory ?? [];
+  scoreboardBody.innerHTML = history.length === 0
+    ? '<div class="scoreboard-empty">Noch keine Runde abgeschlossen.</div>'
+    : (isSchieber(game) ? renderSchieberScoreboard(history) : renderBieterScoreboard(history));
+  scoreboard.classList.remove('hidden');
+}
+
+function closeScoreboard() {
+  scoreboard.classList.add('hidden');
+}
+
+function cardValueTable() {
+  const header = RANKS.map((rank) => `<th>${escapeHtml(RANK_LABELS[rank])}</th>`).join('');
+  const rows = [
+    { label: 'Nebenfarbe', cells: RANKS.map((rank) => cardPoints({ suit: 'eicheln', rank }, 'rosen')) },
+    { label: 'Trumpf', cells: RANKS.map((rank) => cardPoints({ suit: 'rosen', rank }, 'rosen')) },
+    { label: 'Obe-Abe', cells: RANKS.map((rank) => cardPoints({ suit: 'eicheln', rank }, 'obeAbe')) },
+    { label: 'Une-Ufe', cells: RANKS.map((rank) => cardPoints({ suit: 'eicheln', rank }, 'uneUfe')) },
+  ];
+
+  const body = rows
+    .map((row) => `<tr><td>${row.label}</td>${row.cells.map((value) => `<td>${value}</td>`).join('')}</tr>`)
+    .join('');
+
+  return `
+    <table>
+      <thead><tr><th>Spielart</th>${header}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+  `;
+}
+
+function openRulesSheet() {
+  const sequences = Object.entries(SEQUENCE_POINTS)
+    .map(([length, points]) => `<tr><td>${length} Karten in Folge</td><td>${points}</td></tr>`)
+    .join('');
+  const fourOfKinds = ['under', '9', 'ass', '6']
+    .map((rank) => {
+      const points = fourOfAKindPoints(rank);
+      const label = rank === '6' ? 'Vier Sechser' : `Vier ${RANK_LABELS[rank]}`;
+      return `<tr><td>${escapeHtml(label)}</td><td>${points === 0 ? 'zählen nicht' : points}</td></tr>`;
+    })
+    .join('');
+  const multipliers = Object.entries(RULE_SET.roundMultipliers)
+    .map(([mode, factor]) => `<tr><td>${escapeHtml(getRoundModeLabel(mode))}</td><td>x${factor}</td></tr>`)
+    .join('');
+  const tieBreak = RULE_SET.fourOfAKindBeatsSequence
+    ? 'vier Gleiche gegen eine Folge'
+    : 'die Folge gegen vier Gleiche';
+
+  rulesSheetBody.innerHTML = `
+    <h3>Bedienpflicht</h3>
+    <ul>
+      <li>Die angespielte Farbe muss bedient werden.</li>
+      <li>Trumpf darf jederzeit gespielt werden, auch wenn du bedienen könntest.</li>
+      <li>Untertrumpfen ist verboten, ausser du hast nur noch Trumpf.</li>
+      <li>Wird Trumpf angespielt, musst du Trumpf bedienen. Ausnahme: der Puur als einziger Trumpf.</li>
+      <li>Wer nicht bedienen kann, darf abwerfen. Einen Trumpfzwang gibt es nicht.</li>
+    </ul>
+
+    <h3>Kartenwerte</h3>
+    ${cardValueTable()}
+
+    <h3>Weis</h3>
+    <table>
+      <thead><tr><th>Weis</th><th>Punkte</th></tr></thead>
+      <tbody>${sequences}${fourOfKinds}</tbody>
+    </table>
+    <ul>
+      <li>Nur das Team mit dem höchsten Weis schreibt, dafür alle seine gemeldeten Weise.</li>
+      <li>Bei gleicher Punktzahl gewinnen ${tieBreak}, danach die höhere Karte, dann Trumpf, dann Vorhand.</li>
+    </ul>
+
+    <h3>Zusatzpunkte</h3>
+    <ul>
+      <li>Stöck (König und Ober der Trumpffarbe): ${RULE_SET.stoeckPoints} Punkte, unabhängig vom Weis-Vergleich.</li>
+      <li>Letzter Stich: ${RULE_SET.lastTrickBonus} Punkte.</li>
+      <li>Match (alle Stiche einer Runde): ${RULE_SET.matchBonus} Punkte.</li>
+      <li>Eine Runde ergibt damit ${152 + RULE_SET.lastTrickBonus} Stichpunkte.</li>
+    </ul>
+
+    <h3>Multiplikatoren im 2500er-Schieber</h3>
+    <table>
+      <thead><tr><th>Spielart</th><th>Faktor</th></tr></thead>
+      <tbody>${multipliers}</tbody>
+    </table>
+  `;
+  rulesSheet.classList.remove('hidden');
+}
+
+function closeRulesSheet() {
+  rulesSheet.classList.add('hidden');
+}
+
 function renderLog() {
   logEl.innerHTML = [...game.log]
     .reverse()
@@ -1029,6 +1277,7 @@ function render() {
   }
 
   gameModeLabel.textContent = game.variant.modeLabel;
+  renderSpeedButton();
   applyVariantClasses();
   placeCapturedPiles();
   renderScorePanel();
@@ -1045,25 +1294,70 @@ function render() {
   renderLog();
 }
 
+function clearPendingAiAction() {
+  if (pendingAiTimeout !== null) {
+    window.clearTimeout(pendingAiTimeout);
+    pendingAiTimeout = null;
+  }
+  pendingAiAction = null;
+  aiLocked = false;
+}
+
+function runPendingAiAction() {
+  const action = pendingAiAction;
+  clearPendingAiAction();
+
+  if (!game || !action) {
+    return;
+  }
+  try {
+    action();
+  } catch (error) {
+    msgEl.textContent = error.message;
+    return;
+  }
+  gameLoop();
+}
+
+/** Ein Tipp auf den Tisch ueberspringt die laufende Wartezeit. */
+function skipPendingDelay() {
+  if (pendingAiAction) {
+    runPendingAiAction();
+  }
+}
+
 function queueAiAction(delayMs, action) {
   aiLocked = true;
-  window.setTimeout(() => {
-    aiLocked = false;
-    if (!game) {
-      return;
-    }
-    try {
-      action();
-    } catch (error) {
-      msgEl.textContent = error.message;
-      return;
-    }
-    gameLoop();
-  }, delayMs);
+  pendingAiAction = action;
+  pendingAiTimeout = window.setTimeout(runPendingAiAction, delayMs);
 }
 
 function randomDelay([min, max]) {
-  return min + Math.floor(Math.random() * (max - min + 1));
+  const base = min + Math.floor(Math.random() * (max - min + 1));
+  return Math.round(base * (SPEED_FACTORS[selectedSpeed] ?? 1));
+}
+
+function renderSpeedButton() {
+  btnSpeed.textContent = `Tempo: ${SPEED_LABELS[selectedSpeed]}`;
+  btnSpeed.setAttribute('aria-label', `Tempo umschalten, aktuell ${SPEED_LABELS[selectedSpeed]}`);
+}
+
+function renderSetupSpeedOptions() {
+  setupSpeedOptions.innerHTML = SPEED_ORDER.map((speed) => {
+    const active = selectedSpeed === speed;
+    return `
+      <button
+        type="button"
+        class="target-card${active ? ' active' : ''}"
+        data-speed="${speed}"
+        aria-pressed="${active ? 'true' : 'false'}"
+      >
+        <span class="target-title">${escapeHtml(SPEED_LABELS[speed])}</span>
+      </button>
+    `;
+  }).join('');
+
+  setupSpeedHint.textContent = SPEED_COPY[selectedSpeed];
 }
 
 function gameLoop() {
@@ -1135,9 +1429,9 @@ function resumeSavedGame() {
   }
 
   game = saved.game;
-  aiLocked = false;
+  clearPendingAiAction();
   animatedTrickCards = new Set();
-  closeTrickReview();
+  closeAllDialogs();
 
   screenSetup.classList.add('hidden');
   screenGame.classList.remove('hidden');
@@ -1154,9 +1448,9 @@ function startSelectedGame() {
   clearSavedGame();
 
   game = createGame({ variantId: selectedVariantId, playerName, matchConfig });
-  aiLocked = false;
+  clearPendingAiAction();
   animatedTrickCards = new Set();
-  closeTrickReview();
+  closeAllDialogs();
 
   screenSetup.classList.add('hidden');
   screenGame.classList.remove('hidden');
@@ -1167,9 +1461,9 @@ function startSelectedGame() {
 
 function returnHome() {
   game = null;
-  aiLocked = false;
+  clearPendingAiAction();
   animatedTrickCards = new Set();
-  closeTrickReview();
+  closeAllDialogs();
   clearSavedGame();
   screenGame.classList.add('hidden');
   screenSetup.classList.remove('hidden');
@@ -1180,6 +1474,49 @@ variantCards.forEach((card) => {
   card.addEventListener('click', () => {
     setSetupVariant(card.dataset.variant);
   });
+});
+
+setupSpeedOptions.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-speed]');
+  if (!button) {
+    return;
+  }
+
+  selectedSpeed = button.dataset.speed;
+  renderSetupSpeedOptions();
+});
+
+btnSpeed.addEventListener('click', () => {
+  const next = (SPEED_ORDER.indexOf(selectedSpeed) + 1) % SPEED_ORDER.length;
+  selectedSpeed = SPEED_ORDER[next];
+  renderSpeedButton();
+  renderSetupSpeedOptions();
+  saveSettings();
+});
+
+btnScoreboard.addEventListener('click', openScoreboard);
+btnCloseScoreboard.addEventListener('click', closeScoreboard);
+scoreboard.addEventListener('click', (event) => {
+  if (event.target === scoreboard) {
+    closeScoreboard();
+  }
+});
+
+btnRules.addEventListener('click', openRulesSheet);
+btnRulesSetup.addEventListener('click', openRulesSheet);
+btnCloseRules.addEventListener('click', closeRulesSheet);
+rulesSheet.addEventListener('click', (event) => {
+  if (event.target === rulesSheet) {
+    closeRulesSheet();
+  }
+});
+
+// Tipp auf den Tisch ueberspringt die Wartezeit des Computers.
+tableArea.addEventListener('click', (event) => {
+  if (event.target.closest('.card-face, button, .control-box, .stich-pile')) {
+    return;
+  }
+  skipPendingDelay();
 });
 
 setupDifficultyOptions.addEventListener('click', (event) => {
@@ -1260,7 +1597,7 @@ btnWeisSkip.addEventListener('click', () => {
 
 btnNextRound.addEventListener('click', () => {
   animatedTrickCards = new Set();
-  closeTrickReview();
+  closeAllDialogs();
   startRound(game);
   gameLoop();
 });
@@ -1280,8 +1617,17 @@ trickReview.addEventListener('click', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !trickReview.classList.contains('hidden')) {
+  if (event.key !== 'Escape') {
+    return;
+  }
+  if (!trickReview.classList.contains('hidden')) {
     closeTrickReview();
+  }
+  if (!scoreboard.classList.contains('hidden')) {
+    closeScoreboard();
+  }
+  if (!rulesSheet.classList.contains('hidden')) {
+    closeRulesSheet();
   }
 });
 

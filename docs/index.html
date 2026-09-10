@@ -34,7 +34,7 @@
 
       <div class="setup-form">
         <label for="player-name">Dein Name</label>
-        <input id="player-name" type="text" value="Nadinka" maxlength="18" />
+        <input id="player-name" type="text" placeholder="Dein Name" maxlength="18" />
 
         <div class="setup-target-section">
           <div class="setup-target-head">
@@ -42,6 +42,14 @@
             <span id="setup-difficulty-hint" class="setup-target-hint"></span>
           </div>
           <div id="setup-difficulty-options" class="target-picker" aria-label="Schwierigkeit wählen"></div>
+        </div>
+
+        <div class="setup-target-section">
+          <div class="setup-target-head">
+            <span class="setup-target-label">Tempo</span>
+            <span id="setup-speed-hint" class="setup-target-hint"></span>
+          </div>
+          <div id="setup-speed-options" class="target-picker" aria-label="Tempo wählen"></div>
         </div>
 
         <div id="setup-target-section" class="setup-target-section hidden">
@@ -62,6 +70,7 @@
           <summary>Aktuelle Grundregeln</summary>
           <ul id="setup-rules-list"></ul>
         </details>
+        <button id="btn-rules-setup" class="btn btn-secondary btn-slim" type="button">Alle Regeln und Punkte</button>
       </div>
     </div>
   </div>
@@ -74,7 +83,12 @@
       </div>
       <div class="top-actions">
         <div id="score-panel" class="score-panel"></div>
-        <button id="btn-home" class="btn btn-secondary btn-home" type="button">Home</button>
+        <div class="top-buttons">
+          <button id="btn-speed" class="btn btn-secondary btn-slim" type="button" title="Tempo umschalten">Tempo</button>
+          <button id="btn-scoreboard" class="btn btn-secondary btn-slim" type="button">Jasstafel</button>
+          <button id="btn-rules" class="btn btn-secondary btn-slim" type="button">Regeln</button>
+          <button id="btn-home" class="btn btn-secondary btn-home" type="button">Home</button>
+        </div>
       </div>
     </header>
 
@@ -205,6 +219,24 @@
       </div>
     </div>
   </div>
+
+    <div id="scoreboard" class="trick-review hidden" role="dialog" aria-modal="true" aria-labelledby="scoreboard-title">
+      <div class="trick-review-box trick-review-box-wide">
+        <button id="btn-close-scoreboard" class="review-close" type="button" aria-label="Jasstafel schliessen">&times;</button>
+        <div class="review-kicker">Partieverlauf</div>
+        <h2 id="scoreboard-title">Jasstafel</h2>
+        <div id="scoreboard-body" class="scoreboard-body"></div>
+      </div>
+    </div>
+
+    <div id="rules-sheet" class="trick-review hidden" role="dialog" aria-modal="true" aria-labelledby="rules-sheet-title">
+      <div class="trick-review-box trick-review-box-wide">
+        <button id="btn-close-rules" class="review-close" type="button" aria-label="Regeln schliessen">&times;</button>
+        <div class="review-kicker">Schweizer Jassregeln</div>
+        <h2 id="rules-sheet-title">Regeln und Punkte</h2>
+        <div id="rules-sheet-body" class="rules-body"></div>
+      </div>
+    </div>
 
   <script type="module" src="./app.js"></script>
 </body>

@@ -6,8 +6,9 @@ Lokale Web-App für Schweizer Jass mit gemeinsamem Grundgerüst für mehrere Jas
 
 - `Bieterjass` mit 3 Spielern: du gegen 2 Computer
 - `Schieber Jass` mit 4 Spielern: du mit Partner gegen 2 Computer
-- Homescreen mit Auswahl der Jassart, des Punkteziels und der Schwierigkeit
+- Homescreen mit Auswahl der Jassart, des Punkteziels, der Schwierigkeit und des Tempos
 - Laufende Partie wird lokal gesichert und kann fortgesetzt werden
+- Jasstafel mit dem ganzen Partieverlauf, Regel-Screen mit allen Punktetabellen
 - Gemeinsame Frontend-Spielengine für Kartenlogik, Trumpfwahl, Weis, Stöck, Match, Stichauswertung und Rundensummen
 - Bedienpflicht nach den offiziellen Schweizer Jassregeln, abgesichert durch eine Testsuite
 - Express-Server für lokale Auslieferung und als Basis für späteren Online-Zugang
@@ -94,6 +95,14 @@ node scripts/benchmark-ai.mjs normal einfach 300
 
 Beide Seiten spielen dieselben Kartenverteilungen mit getauschten Sitzplätzen. Gemessene Siegquoten (600 Partien): normal gegen einfach 74%, schwer gegen normal 63%, schwer gegen einfach 80%.
 
+## Bedienung
+
+- **Tempo**: Langsam, Normal oder Schnell, umschaltbar im Setup und jederzeit über den Knopf in der Kopfzeile. Ein Tipp auf den Tisch überspringt zusätzlich die laufende Wartezeit des Computers.
+- **Jasstafel**: zeigt jede gespielte Runde mit Spielart, Multiplikator, Rundenpunkten und Gesamtstand. Weis, Stöck und Match sind markiert.
+- **Regeln**: Bedienpflicht, Kartenwerte, Weis-Tabelle, Zusatzpunkte und Multiplikatoren. Die Tabellen werden aus der Engine erzeugt und können darum nicht vom Code abweichen.
+- **Tastatur**: Handkarten sind echte Buttons mit `aria-label` und lassen sich per Tab und Enter spielen. `Escape` schliesst jeden Dialog.
+- Der Geber und der eigene Partner sind am Tisch mit einem Abzeichen markiert.
+
 ## Spielstand
 
 Die laufende Partie liegt in `localStorage` (`bachmann-jass:game:v1`) und wird nach jedem Zug sowie beim Wegschalten der App gesichert. Auf dem Homescreen erscheint dann `Partie fortsetzen`. Name, Jassart, Punkteziel und Schwierigkeit werden ebenfalls gemerkt. Ist `localStorage` blockiert (privates Fenster, gesperrte Site-Daten), läuft die App normal weiter, nur ohne Speicherstand.
@@ -113,6 +122,14 @@ npm.cmd run check:docs
 - alle `getElementById`-Referenzen aus `app.js` gegen die IDs im HTML
 
 `npm run check:docs` schlägt fehl, wenn `docs/` nicht dem aktuellen Stand von `public/` entspricht. Genau das prüft auch die GitHub Action in `.github/workflows/ci.yml`.
+
+### Browsertest
+
+```powershell
+npm.cmd run test:e2e
+```
+
+Startet den lokalen Server, fährt Edge oder Chrome headless über das DevTools-Protokoll und spielt eine Runde durch: Regel-Screen, Tempo, Abzeichen, Tastaturbedienung, Jasstafel, Speicherstand und das Layout in fünf Fenstergrössen von 1440x780 bis iPhone SE. Der Treiber in `tests/browser/cdp.mjs` kommt ohne Abhängigkeiten aus. Ist kein Chromium-Browser installiert, überspringt sich der Test. Er läuft deshalb nicht in der CI, sondern lokal.
 
 ## Starten
 
