@@ -6,13 +6,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const publicDir = path.join(rootDir, "public");
-const assetsDir = path.join(rootDir, "assets");
 const port = Number(process.env.PORT) || 3000;
 
 const app = express();
 
 app.use(express.static(publicDir));
-app.use("/assets", express.static(assetsDir));
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, app: "bachmann-jass-local" });

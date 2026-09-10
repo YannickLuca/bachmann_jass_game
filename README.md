@@ -21,7 +21,12 @@ Lokale Web-App für Schweizer Jass mit gemeinsamem Grundgerüst für mehrere Jas
 - `public/ai.js` -> Spielstrategie der Computergegner
 - `public/app.js` -> UI, Rendering und Spielablauf
 - `src/server.js` -> lokaler Webserver
-- `src/game.js` -> Regelprofile und Projektstatus für den späteren Backend-Ausbau
+- `scripts/build-site.mjs` -> Build nach `dist/` für die Veröffentlichung
+- `scripts/benchmark-ai.mjs` -> misst zwei KI-Stufen gegeneinander
+- `tests/engine/` -> Regel-, Strategie- und Strukturtests (`node --test`)
+- `tests/browser/` -> End-to-End-Test über das DevTools-Protokoll
+
+`public/` ist die einzige Quelle der App. Es gibt keine zweite Kopie der Kartenbilder im Repository; `dist/` entsteht beim Build und ist nicht eingecheckt.
 
 ## Regeln in dieser Grundversion
 
@@ -111,7 +116,7 @@ Die laufende Partie liegt in `localStorage` (`bachmann-jass:game:v1`) und wird n
 
 ```powershell
 npm.cmd test
-npm.cmd run check:docs
+npm.cmd run lint
 ```
 
 `npm test` prüft Regelengine, Strategie und App-Struktur mit `node --test`. Enthalten sind unter anderem:
@@ -121,7 +126,7 @@ npm.cmd run check:docs
 - ein Spielstand, der JSON überlebt und danach zu Ende gespielt wird
 - alle `getElementById`-Referenzen aus `app.js` gegen die IDs im HTML
 
-`npm run check:docs` schlägt fehl, wenn `docs/` nicht dem aktuellen Stand von `public/` entspricht. Genau das prüft auch die GitHub Action in `.github/workflows/ci.yml`.
+`npm run lint` prüft mit ESLint auf echte Fehlerquellen (undefinierte Namen, toter Code, verschluckte Zuweisungen), nicht auf Formatierung. Beides läuft auch in der GitHub Action `.github/workflows/ci.yml`.
 
 ### Browsertest
 
@@ -146,22 +151,15 @@ Danach im Browser:
 
 ## GitHub Pages
 
-Für GitHub Pages wird die statische Web-App aus `docs/` veröffentlicht.
+Die App liegt unter <https://yannickluca.github.io/bachmann_jass_game/>.
 
-- `docs/index.html` ist der Einstiegspunkt
-- `docs/.nojekyll` verhindert, dass GitHub Pages die App als Jekyll-Seite behandelt
-- `docs/manifest.webmanifest` und `docs/service-worker.js` machen die App installierbar
-- in GitHub steht unter `Settings -> Pages` aktuell `Deploy from a branch` mit **Root** statt `/docs`
+Veröffentlicht wird über die Action `.github/workflows/pages.yml`: Sie testet, baut `public/` nach `dist/` und deployt das Ergebnis. In GitHub steht unter `Settings -> Pages` als Quelle `GitHub Actions`. Ein Push auf `main` genügt, ein manueller Build-Schritt entfällt.
 
-Die App liegt deshalb unter `https://yannickluca.github.io/bachmann_jass_game/docs/`, nicht direkt unter der Repo-URL. Sie funktioniert so vollständig. Stellt man Pages auf `/docs` um, wandert die App auf die kürzere Adresse ohne `/docs` - dann muss aber jedes bereits gespeicherte Home-Bildschirm-Symbol neu angelegt werden.
-
-Nach jeder Änderung an `public/`:
+Der Build setzt dabei den Cachenamen des Service Workers aus einem Hash der App-Dateien. Ohne diesen Bump würde eine bereits installierte PWA weiterhin die alte Version aus ihrem Cache ausliefern. Lokal lässt sich dasselbe Ergebnis erzeugen:
 
 ```powershell
-npm.cmd run deploy
+npm.cmd run build
 ```
-
-Der Build kopiert `public/` nach `docs/` und setzt dabei den Cachenamen des Service Workers aus einem Hash der App-Dateien. Ohne diesen Bump würde eine bereits installierte PWA weiterhin die alte Version aus ihrem Cache ausliefern.
 
 ## Als Web-App Installieren
 

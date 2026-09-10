@@ -1,6 +1,5 @@
 node_modules/
 dist/
+.tmp_edge_profile/
 .env
 npm-debug.log*
-
-.tmp_edge_profile/

@@ -9,9 +9,13 @@
     "dev": "node src/server.js",
     "build": "node scripts/build-site.mjs",
     "test": "node --test tests/engine/*.test.mjs",
-    "test:e2e": "node tests/browser/app.e2e.mjs"
+    "test:e2e": "node tests/browser/app.e2e.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5"
   }
 }

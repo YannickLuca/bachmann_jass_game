@@ -1080,17 +1080,8 @@ export function getLegalCards(hand, trickCards, roundMode) {
   return legal.length > 0 ? legal : [...hand];
 }
 
-export function getPlayableCards(hand, trickCards, roundMode, variantId = 'bieter') {
-  return getLegalCards(hand, trickCards, roundMode);
-}
-
 export function getPlayableCardsForPlayer(game, playerIndex) {
-  return getPlayableCards(
-    game.players[playerIndex].hand,
-    game.trick,
-    game.roundMode,
-    game.variantId
-  );
+  return getLegalCards(game.players[playerIndex].hand, game.trick, game.roundMode);
 }
 
 export function trickWinner(trickCards, roundMode) {

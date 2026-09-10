@@ -21,6 +21,9 @@ jobs:
       - name: Abhaengigkeiten installieren
         run: npm ci
 
+      - name: Code pruefen
+        run: npm run lint
+
       - name: Regelengine testen
         run: npm test
 
