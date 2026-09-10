@@ -1205,6 +1205,10 @@ body {
   width: 100%;
   display: flex;
   justify-content: center;
+  /* Die Bedienleiste muss ueber den Gegnerhaenden liegen, sonst verdecken
+     deren Karten auf schmalen Geraeten die Spielartwahl. */
+  position: relative;
+  z-index: 60;
 }
 
 .control-box {
