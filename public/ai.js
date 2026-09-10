@@ -16,6 +16,7 @@ import {
   cardPoints,
   createDeck,
   getGameDifficulty,
+  getGameTrickMode,
   getPlayableCardsForPlayer,
   getRoundMultiplier,
   isTrumpMode,
@@ -112,9 +113,15 @@ export function evaluateNoTrumpMode(hand, roundMode) {
 }
 
 export function evaluateRoundMode(hand, roundMode) {
-  return isTrumpMode(roundMode)
-    ? evaluateTrumpSuit(hand, roundMode)
-    : evaluateNoTrumpMode(hand, roundMode);
+  if (isTrumpMode(roundMode)) {
+    return evaluateTrumpSuit(hand, roundMode);
+  }
+  if (roundMode === 'slalom') {
+    // Slalom braucht beides: hohe Karten fuer die Obenabe-Stiche und tiefe
+    // fuer die Une-Ufe-Stiche.
+    return Math.round((evaluateNoTrumpMode(hand, 'obeAbe') + evaluateNoTrumpMode(hand, 'uneUfe')) / 2);
+  }
+  return evaluateNoTrumpMode(hand, roundMode);
 }
 
 /** Uebersetzt eine Handbewertung in erwartete Rundenpunkte. */
@@ -167,12 +174,20 @@ export function aiBidDecision(hand, currentHighestBid) {
  * Kartenspiel
  * ------------------------------------------------------------------ */
 
+/**
+ * Im Slalom wechselt die Spielart pro Stich. Alle Stichbewertungen muessen
+ * darum die Spielart des laufenden Stichs verwenden, nicht die der Runde.
+ */
+function trickMode(game) {
+  return getGameTrickMode(game);
+}
+
 function isTrumpCard(game, card) {
-  return isTrumpMode(game.roundMode) && card.suit === game.roundMode;
+  return isTrumpMode(trickMode(game)) && card.suit === trickMode(game);
 }
 
 function wouldWin(game, playerIndex, card) {
-  return trickWinner([...game.trick, { playerIndex, card }], game.roundMode) === playerIndex;
+  return trickWinner([...game.trick, { playerIndex, card }], trickMode(game)) === playerIndex;
 }
 
 /** Karten, die weder gespielt wurden noch auf der eigenen Hand liegen. */
@@ -190,29 +205,29 @@ function isTrickSafe(game, playerIndex, card, leadingPlayerIndex) {
   const openSeats = game.players.length - simulated.length;
 
   if (openSeats <= 0) {
-    return trickWinner(simulated, game.roundMode) === leadingPlayerIndex;
+    return trickWinner(simulated, trickMode(game)) === leadingPlayerIndex;
   }
 
   return unseenCards(game, playerIndex).every((other) =>
-    trickWinner([...simulated, { playerIndex: -1, card: other }], game.roundMode) !== -1
+    trickWinner([...simulated, { playerIndex: -1, card: other }], trickMode(game)) !== -1
   );
 }
 
 /** Hoechste noch nicht gesehene Karte dieser Farbe schlagen? */
 function isHighestRemaining(game, playerIndex, card) {
   return !unseenCards(game, playerIndex).some((other) =>
-    other.suit === card.suit && rankIndex(other, game.roundMode) > rankIndex(card, game.roundMode)
+    other.suit === card.suit && rankIndex(other, trickMode(game)) > rankIndex(card, trickMode(game))
   );
 }
 
 const byPointsAscending = (game) => (first, second) =>
-  cardPoints(first, game.roundMode) - cardPoints(second, game.roundMode);
+  cardPoints(first, trickMode(game)) - cardPoints(second, trickMode(game));
 const byPointsDescending = (game) => (first, second) =>
-  cardPoints(second, game.roundMode) - cardPoints(first, game.roundMode);
+  cardPoints(second, trickMode(game)) - cardPoints(first, trickMode(game));
 const byRankAscending = (game) => (first, second) =>
-  rankIndex(first, game.roundMode) - rankIndex(second, game.roundMode);
+  rankIndex(first, trickMode(game)) - rankIndex(second, trickMode(game));
 const byRankDescending = (game) => (first, second) =>
-  rankIndex(second, game.roundMode) - rankIndex(first, game.roundMode);
+  rankIndex(second, trickMode(game)) - rankIndex(first, trickMode(game));
 
 function suitLength(hand, suit) {
   return hand.filter((card) => card.suit === suit).length;
@@ -283,10 +298,10 @@ function chooseSmear(game, playerIndex, legal) {
 }
 
 function chooseFollow(game, playerIndex, legal, useMemory) {
-  const currentWinner = trickWinner(game.trick, game.roundMode);
+  const currentWinner = trickWinner(game.trick, trickMode(game));
   const partnerWinning = sameSide(game, currentWinner, playerIndex) && currentWinner !== playerIndex;
   const isLastSeat = game.trick.length === game.players.length - 1;
-  const pointsAtStake = trickPoints(game.trick, game.roundMode);
+  const pointsAtStake = trickPoints(game.trick, trickMode(game));
   const winningCards = legal.filter((card) => wouldWin(game, playerIndex, card));
 
   if (partnerWinning) {
@@ -324,8 +339,8 @@ function chooseFollow(game, playerIndex, legal, useMemory) {
 
 function chooseSimple(game, playerIndex, legal) {
   if (game.trick.length === 0) {
-    const trumps = isTrumpMode(game.roundMode)
-      ? legal.filter((card) => card.suit === game.roundMode)
+    const trumps = isTrumpMode(trickMode(game))
+      ? legal.filter((card) => card.suit === trickMode(game))
       : [];
     if (trumps.length >= 2) {
       return [...trumps].sort(byRankDescending(game))[0];
@@ -333,7 +348,7 @@ function chooseSimple(game, playerIndex, legal) {
     return [...legal].sort(byRankDescending(game))[0];
   }
 
-  const currentWinner = trickWinner(game.trick, game.roundMode);
+  const currentWinner = trickWinner(game.trick, trickMode(game));
   const teammateWinning = sameSide(game, currentWinner, playerIndex);
   const winningCards = legal.filter((card) => wouldWin(game, playerIndex, card));
 

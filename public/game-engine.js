@@ -6,7 +6,7 @@ export const SUIT_LABELS = {
   schilten: 'Schilten',
 };
 
-export const ROUND_MODE_OPTIONS = [...SUITS, 'obeAbe', 'uneUfe'];
+export const ROUND_MODE_OPTIONS = [...SUITS, 'obeAbe', 'uneUfe', 'slalom'];
 export const ROUND_MODE_LABELS = {
   eicheln: 'Eicheln',
   rosen: 'Rosen',
@@ -14,6 +14,7 @@ export const ROUND_MODE_LABELS = {
   schilten: 'Schilten',
   obeAbe: 'Obe-Abe',
   uneUfe: 'Une-Ufe',
+  slalom: 'Slalom',
 };
 
 export const SCHIEBER_TARGET_SCORES = [1000, 2500];
@@ -114,12 +115,13 @@ export const RULE_SET = {
   fourSixesCount: false,
   fourOfAKindBeatsSequence: true,
   roundMultipliers: {
-    schellen: 1,
-    schilten: 1,
-    rosen: 2,
-    eicheln: 2,
+    rosen: 1,
+    eicheln: 1,
+    schellen: 2,
+    schilten: 2,
     obeAbe: 3,
-    uneUfe: 4,
+    uneUfe: 3,
+    slalom: 3,
   },
 };
 
@@ -156,11 +158,13 @@ export const GAME_VARIANTS = {
     rules: [
       '36 Karten (6 bis Ass), 9 Karten pro Spieler, in 3er-Paketen verteilt.',
       'Es wird zu viert in festen Teams gespielt: du mit Partner gegen 2 Computer.',
-      'Vorhand wählt Trumpf, Obe-Abe oder Une-Ufe oder schiebt die Wahl einmal an den Partner weiter.',
+      'Vorhand wählt Trumpf, Obe-Abe, Une-Ufe oder Slalom oder schiebt die Wahl einmal an den Partner weiter.',
       'Vor dem ersten Stich wird gewiesen. Nur das Team mit dem höchsten Weis schreibt seine Weise.',
-      'Stöck (König + Ober der Trumpffarbe) gibt 20 Punkte, unabhängig vom Weis-Vergleich.',
+      'Stöck (König + Ober der Trumpffarbe) gibt 20 Punkte. Angesagt wird es beim Ausspielen der zweiten der beiden Karten, oder schon beim Weisen, wenn beide in einem gemeldeten Weis stecken.',
+      'Slalom: der erste Stich geht obenabe, der zweite unten-ufe, danach wieder abwechselnd.',
       'Letzter Stich gibt 5 Zusatzpunkte, alle neun Stiche (Match) geben 100 Zusatzpunkte.',
-      'Zielscore ist 1000 oder 2500. Im 2500er gelten Multiplikatoren: Schellen/Schilten x1, Rosen/Eicheln x2, Obe-Abe x3, Une-Ufe x4.',
+      'Spielart-Multiplikatoren gelten in beiden Partien: Rosen/Eicheln x1, Schellen/Schilten x2, Obe-Abe/Une-Ufe/Slalom x3.',
+      'Zielscore ist 1000 oder 2500. Er bestimmt nur die Länge der Partie.',
     ],
   },
 };
@@ -178,7 +182,23 @@ export function isTrumpMode(roundMode) {
 }
 
 export function isNoTrumpMode(roundMode) {
-  return roundMode === 'obeAbe' || roundMode === 'uneUfe';
+  return roundMode === 'obeAbe' || roundMode === 'uneUfe' || roundMode === 'slalom';
+}
+
+/**
+ * Im Slalom wechselt die Spielart mit jedem Stich: der erste Stich geht
+ * obenabe, der zweite unten-ufe, der dritte wieder obenabe und so weiter.
+ * Kartenwerte und Rangfolge richten sich nach der Spielart des Stichs.
+ */
+export function getTrickMode(roundMode, trickNumber = 0) {
+  if (roundMode !== 'slalom') {
+    return roundMode;
+  }
+  return trickNumber % 2 === 0 ? 'obeAbe' : 'uneUfe';
+}
+
+export function getGameTrickMode(game) {
+  return getTrickMode(game.roundMode, game.trickNumber);
 }
 
 export function getRoundModeLabel(roundMode) {
@@ -217,17 +237,15 @@ export function getGameTargetScore(game) {
   return game.matchConfig?.targetScore ?? game.variant.targetScore;
 }
 
-export function getRoundMultiplier(gameOrTargetScore, maybeRoundMode = null) {
-  const targetScore = typeof gameOrTargetScore === 'number'
-    ? normalizeSchieberTargetScore(gameOrTargetScore)
-    : getGameTargetScore(gameOrTargetScore);
-  const roundMode = typeof gameOrTargetScore === 'number'
-    ? maybeRoundMode
-    : gameOrTargetScore.roundMode;
+/**
+ * Die Spielart-Multiplikatoren gelten in beiden Partien gleich, im 1000er
+ * wie im 2500er. Der Zielscore bestimmt nur die Laenge der Partie.
+ */
+export function getRoundMultiplier(gameOrRoundMode, maybeRoundMode = null) {
+  const roundMode = typeof gameOrRoundMode === 'string'
+    ? gameOrRoundMode
+    : (typeof gameOrRoundMode === 'number' ? maybeRoundMode : gameOrRoundMode?.roundMode);
 
-  if (targetScore !== 2500) {
-    return 1;
-  }
   return RULE_SET.roundMultipliers[roundMode] ?? 1;
 }
 
@@ -239,7 +257,9 @@ export function cardLabel(card) {
   return `${SUIT_LABELS[card.suit]} ${RANK_LABELS[card.rank]}`;
 }
 
-export function cardPoints(card, roundMode = null) {
+export function cardPoints(card, rawRoundMode = null) {
+  // Slalom ohne Stichnummer faellt auf den ersten Stich zurueck (obenabe).
+  const roundMode = getTrickMode(rawRoundMode);
   if (roundMode === 'obeAbe') {
     return OBE_ABE_POINTS[card.rank];
   }
@@ -249,7 +269,8 @@ export function cardPoints(card, roundMode = null) {
   return card.suit === roundMode ? TRUMP_POINTS[card.rank] : BASE_POINTS[card.rank];
 }
 
-export function rankIndex(card, roundMode = null) {
+export function rankIndex(card, rawRoundMode = null) {
+  const roundMode = getTrickMode(rawRoundMode);
   if (roundMode === 'uneUfe') {
     return UNE_UFE_ORDER.indexOf(card.rank);
   }
@@ -355,8 +376,8 @@ function createTeams(variantId, players) {
   }
 
   return [
-    { id: 0, name: `${players[2].name} + ${players[0].name}`, playerIds: [0, 2], totalScore: 0 },
-    { id: 1, name: `${players[1].name} + ${players[3].name}`, playerIds: [1, 3], totalScore: 0 },
+    { id: 0, name: `${players[2].name} und ${players[0].name}`, playerIds: [0, 2], totalScore: 0 },
+    { id: 1, name: `${players[1].name} und ${players[3].name}`, playerIds: [1, 3], totalScore: 0 },
   ];
 }
 
@@ -397,6 +418,7 @@ export function createGame({ variantId = 'bieter', playerName = 'Du', matchConfi
     teamWeisBreakdown: { 0: [], 1: [] },
     teamStoeckPoints: { 0: 0, 1: 0 },
     stoeckPlayer: -1,
+    stoeckAnnounced: false,
     weisState: null,
     log: [],
     roundSummary: null,
@@ -494,6 +516,7 @@ export function startRound(game) {
   game.teamWeisBreakdown = { 0: [], 1: [] };
   game.teamStoeckPoints = { 0: 0, 1: 0 };
   game.stoeckPlayer = -1;
+  game.stoeckAnnounced = false;
   game.weisState = null;
   game.roundSummary = null;
 
@@ -811,19 +834,37 @@ export function hasStoeck(hand, roundMode) {
     && hand.some((card) => card.suit === roundMode && card.rank === 'ober');
 }
 
-function awardStoeck(game) {
-  const stoeckPlayer = game.players.findIndex((player) => hasStoeck(player.hand, game.roundMode));
-  game.stoeckPlayer = stoeckPlayer;
+/** Merkt sich nur, wer Stöck hat. Angesagt wird es erst waehrend des Spiels. */
+function detectStoeckHolder(game) {
+  game.stoeckPlayer = game.players.findIndex((player) => hasStoeck(player.hand, game.roundMode));
+  game.stoeckAnnounced = false;
+}
 
-  if (stoeckPlayer < 0) {
+/**
+ * Stöck wird angesagt, sobald die zweite der beiden Karten gespielt ist - oder
+ * schon beim Weisen, wenn beide Karten in einem gemeldeten Weis stecken
+ * (zum Beispiel Under-Ober-König als Dreiblatt im Trumpf).
+ */
+function announceStoeck(game, reason) {
+  if (game.stoeckPlayer < 0 || game.stoeckAnnounced) {
     return;
   }
 
-  const teamId = game.players[stoeckPlayer].teamId;
+  game.stoeckAnnounced = true;
+  const teamId = game.players[game.stoeckPlayer].teamId;
   game.teamStoeckPoints[teamId] = RULE_SET.stoeckPoints;
   game.log.push(
-    `${game.players[stoeckPlayer].name} hat Stöck (${SUIT_LABELS[game.roundMode]} König + Ober) und schreibt ${RULE_SET.stoeckPoints} Punkte.`
+    `${game.players[game.stoeckPlayer].name} sagt Stöck an (${SUIT_LABELS[game.roundMode]} König und Ober${reason}) und schreibt ${RULE_SET.stoeckPoints} Punkte.`
   );
+}
+
+function stoeckCardIds(game) {
+  return [`${game.roundMode}_koenig`, `${game.roundMode}_ober`];
+}
+
+/** Fuer den Weis-Vergleich zaehlt im Slalom die Spielart des ersten Stichs. */
+function weisMode(game) {
+  return getTrickMode(game.roundMode, 0);
 }
 
 function startWeisPhase(game) {
@@ -832,10 +873,10 @@ function startWeisPhase(game) {
   const highestByPlayer = {};
 
   order.forEach((playerIndex) => {
-    const detected = detectWeis(game.players[playerIndex].hand, game.roundMode)
+    const detected = detectWeis(game.players[playerIndex].hand, weisMode(game))
       .map((weis) => ({ ...weis, playerIndex }));
     possibleByPlayer[playerIndex] = detected;
-    highestByPlayer[playerIndex] = highestWeis(detected, game.roundMode);
+    highestByPlayer[playerIndex] = highestWeis(detected, weisMode(game));
   });
 
   game.weisState = {
@@ -851,7 +892,7 @@ function startWeisPhase(game) {
   game.phase = 'announceWeis';
   game.currentPlayer = order[0];
   game.log.push('Weisrunde beginnt.');
-  awardStoeck(game);
+  detectStoeckHolder(game);
 }
 
 function finishWeisPhase(game) {
@@ -868,7 +909,7 @@ function finishWeisPhase(game) {
     if (!best) {
       return current;
     }
-    const comparison = compareWeis(current.weis, best.weis, game.roundMode);
+    const comparison = compareWeis(current.weis, best.weis, weisMode(game));
     if (comparison > 0) {
       return current;
     }
@@ -887,7 +928,7 @@ function finishWeisPhase(game) {
 
   const totalWeisPoints = awardedWeis.reduce((sum, weis) => sum + weis.points, 0);
   game.teamWeisScores[winningTeamId] = totalWeisPoints;
-  game.teamWeisBreakdown[winningTeamId] = sortWeisDescending(awardedWeis, game.roundMode);
+  game.teamWeisBreakdown[winningTeamId] = sortWeisDescending(awardedWeis, weisMode(game));
   game.weisState.winningDeclaration = bestEntry;
   game.weisState.awardedTeamId = winningTeamId;
 
@@ -948,6 +989,13 @@ export function submitWeisDeclaration(game, playerIndex, selectedWeisId = null) 
 }
 
 function registerWeisDeclaration(game, playerIndex, selectedWeis) {
+  if (selectedWeis && playerIndex === game.stoeckPlayer) {
+    const needed = stoeckCardIds(game);
+    if (needed.every((id) => selectedWeis.cards.includes(id))) {
+      announceStoeck(game, ' im gemeldeten Weis');
+    }
+  }
+
   game.weisState.declaredByPlayer[playerIndex] = selectedWeis;
   game.weisState.declaredEntries.push({
     playerIndex,
@@ -964,6 +1012,11 @@ function registerWeisDeclaration(game, playerIndex, selectedWeis) {
   game.currentPlayer = game.weisState.order[game.weisState.currentIndex];
 }
 
+/** Im Bieterjass wird nur eine Trumpffarbe gewaehlt, im Schieber alle Spielarten. */
+export function getAllowedRoundModes(game) {
+  return isSchieber(game) ? ROUND_MODE_OPTIONS : [...SUITS];
+}
+
 export function chooseTrump(game, roundMode) {
   if (game.phase !== 'chooseTrump') {
     throw new Error('Nicht in der Spielartwahl.');
@@ -972,7 +1025,7 @@ export function chooseTrump(game, roundMode) {
     throw new Error('Kein gültiger Spieler für die Spielartwahl.');
   }
 
-  const allowedModes = isSchieber(game) ? ROUND_MODE_OPTIONS : SUITS;
+  const allowedModes = getAllowedRoundModes(game);
   if (!allowedModes.includes(roundMode)) {
     throw new Error('Unbekannte Spielart.');
   }
@@ -1081,7 +1134,7 @@ export function getLegalCards(hand, trickCards, roundMode) {
 }
 
 export function getPlayableCardsForPlayer(game, playerIndex) {
-  return getLegalCards(game.players[playerIndex].hand, game.trick, game.roundMode);
+  return getLegalCards(game.players[playerIndex].hand, game.trick, getGameTrickMode(game));
 }
 
 export function trickWinner(trickCards, roundMode) {
@@ -1156,6 +1209,13 @@ export function playCard(game, playerIndex, cardId) {
   const [card] = player.hand.splice(cardIndex, 1);
   game.trick.push({ playerIndex, card });
   game.playedCards.push(card);
+
+  if (playerIndex === game.stoeckPlayer && !game.stoeckAnnounced) {
+    const played = new Set(game.playedCards.map((entry) => entry.id));
+    if (stoeckCardIds(game).every((id) => played.has(id))) {
+      announceStoeck(game, '');
+    }
+  }
   game.log.push(`${player.name} spielt ${cardLabel(card)}.`);
 
   if (game.trick.length === game.players.length) {
@@ -1203,10 +1263,11 @@ export function getSchieberTeamRoundPoints(game, teamId) {
 }
 
 export function resolveTrick(game) {
-  const winningPlayer = trickWinner(game.trick, game.roundMode);
+  const trickMode = getGameTrickMode(game);
+  const winningPlayer = trickWinner(game.trick, trickMode);
   const pileId = pileIdForWinner(game, winningPlayer);
   const isLastTrick = game.trickNumber === game.variant.handSize - 1;
-  let points = trickPoints(game.trick, game.roundMode);
+  let points = trickPoints(game.trick, trickMode);
 
   if (isLastTrick) {
     points += RULE_SET.lastTrickBonus;

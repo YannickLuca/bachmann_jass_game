@@ -29,6 +29,8 @@ import {
   getGameTargetScore,
   getRoundMultiplier,
   getRoundModeLabel,
+  getGameTrickMode,
+  getAllowedRoundModes,
   getSchieberTeamBasePoints,
   getSchieberTeamRoundPoints,
   getSchieberTeamMatchPoints,
@@ -382,13 +384,16 @@ function fitHumanHand(handEl) {
 
   // Bis zu drei Durchgaenge: die Begrenzung auf 88 Prozent Ueberdeckung kann
   // einen Rest offen lassen, den der naechste Durchgang aufnimmt.
-  for (let pass = 0; pass < 3; pass += 1) {
+  for (let pass = 0; pass < 4; pass += 1) {
     const overflow = handEl.scrollWidth - handEl.clientWidth;
     if (overflow <= 0) {
       return;
     }
 
-    const currentMargin = Number.parseFloat(window.getComputedStyle(cards[1]).marginLeft) || 0;
+    // Farbtrenner haben einen groesseren Rand: als Bezug taugt nur eine normale Karte.
+    const reference = cards.find((entry, index) => index > 0 && !entry.classList.contains('suit-break'))
+      || cards[1];
+    const currentMargin = Number.parseFloat(window.getComputedStyle(reference).marginLeft) || 0;
     const tightened = currentMargin - overflow / (cards.length - 1);
     const margin = Math.max(tightened, -cardWidth * 0.88);
 
@@ -575,8 +580,8 @@ function renderSetupTargetOptions() {
     // Aus dem RULE_SET erzeugt, damit die Beschreibung nicht von den echten
     // Multiplikatoren abweichen kann.
     const copy = score === 1000
-      ? 'Alle Spielarten zählen einfach.'
-      : describeMultipliers();
+      ? 'Kurze Partie. ' + describeMultipliers()
+      : 'Lange Partie. ' + describeMultipliers();
 
     return `
       <button
@@ -591,9 +596,7 @@ function renderSetupTargetOptions() {
     `;
   }).join('');
 
-  setupTargetHint.textContent = selectedSchieberTargetScore === 2500
-    ? '2500er-Partie mit Multiplikatoren pro Spielart.'
-    : '1000er-Partie ohne Spielart-Multiplikatoren.';
+  setupTargetHint.textContent = 'Die Multiplikatoren gelten in beiden Partien gleich.';
 }
 
 function renderSetupDifficultyOptions() {
@@ -627,9 +630,7 @@ function setSetupVariant(variantId) {
   setupSub.textContent = variant.setupSubtitle;
   const rules = [...variant.rules];
   if (variantId === 'schieber') {
-    rules.push(selectedSchieberTargetScore === 2500
-      ? 'Aktuelle Setup-Wahl: 2500 Punkte mit Runden-Multiplikatoren.'
-      : 'Aktuelle Setup-Wahl: 1000 Punkte, alle Spielarten einfach.');
+    rules.push(`Aktuelle Setup-Wahl: ${selectedSchieberTargetScore} Punkte.`);
   }
   setupRulesList.innerHTML = rules
     .map((rule) => `<li>${escapeHtml(rule)}</li>`)
@@ -702,7 +703,9 @@ function renderTrumpDisplay() {
   }
 
   trumpDisplay.classList.remove('hidden');
-  const modeLabel = getRoundModeLabel(game.roundMode);
+  const modeLabel = game.roundMode === 'slalom'
+    ? `${getRoundModeLabel('slalom')} · ${getRoundModeLabel(getGameTrickMode(game))}`
+    : getRoundModeLabel(game.roundMode);
   const content = isTrumpMode(game.roundMode)
     ? `
       <span class="trump-label">Spielart</span>
@@ -953,7 +956,7 @@ function renderMessage() {
   if (game.phase === 'chooseTrump') {
     if (game.players[game.currentPlayer].isHuman) {
       msgEl.textContent = canPushTrump(game)
-        ? 'Wähle Trumpf, Obe-Abe oder Une-Ufe oder schiebe an deinen Partner.'
+        ? 'Wähle eine Spielart oder schiebe an deinen Partner.'
         : 'Wähle die Spielart für diese Runde.';
       return;
     }
@@ -998,7 +1001,7 @@ function renderMessage() {
     }
 
     const winner = game.teams.find((team) => team.id === game.roundSummary.roundWinnerTeamId);
-    msgEl.textContent = `${winner.name} gewinnt die Runde.`;
+    msgEl.textContent = `${winner.name} gewinnen diese Runde.`;
     msgEl.classList.add('msg-ok');
     return;
   }
@@ -1012,7 +1015,7 @@ function renderMessage() {
     }
 
     const winner = [...game.teams].sort((first, second) => second.totalScore - first.totalScore)[0];
-    msgEl.textContent = `${winner.name} gewinnt das Spiel.`;
+    msgEl.textContent = `${winner.name} gewinnen das Spiel.`;
     msgEl.classList.add('msg-ok');
   }
 }
@@ -1046,6 +1049,12 @@ function renderControls() {
       ? 'Spielart wählen oder schieben:'
       : 'Spielart wählen:';
     btnPush.classList.toggle('hidden', !canPushTrump(game));
+
+    // Im Bieterjass gibt es nur die vier Farben.
+    const allowed = getAllowedRoundModes(game);
+    document.querySelectorAll('.trump-btn').forEach((button) => {
+      button.classList.toggle('hidden', !allowed.includes(button.dataset.mode));
+    });
   }
 }
 
@@ -1302,6 +1311,14 @@ function openRulesSheet() {
       <li>Wer nicht bedienen kann, darf abwerfen. Einen Trumpfzwang gibt es nicht.</li>
     </ul>
 
+    <h3>Spielarten</h3>
+    <ul>
+      <li><strong>Trumpf</strong>: die gewählte Farbe sticht, Under und Nell sind die höchsten Karten.</li>
+      <li><strong>Obe-Abe</strong>: kein Trumpf, das Ass ist die höchste Karte.</li>
+      <li><strong>Une-Ufe</strong>: kein Trumpf, die Sechs ist die höchste Karte.</li>
+      <li><strong>Slalom</strong>: kein Trumpf. Der erste Stich geht obenabe, der zweite unten-ufe, danach wieder abwechselnd. Auch die Kartenwerte richten sich nach der Spielart des laufenden Stichs.</li>
+    </ul>
+
     <h3>Kartenwerte</h3>
     ${cardValueTable()}
 
@@ -1317,13 +1334,14 @@ function openRulesSheet() {
 
     <h3>Zusatzpunkte</h3>
     <ul>
-      <li>Stöck (König und Ober der Trumpffarbe): ${RULE_SET.stoeckPoints} Punkte, unabhängig vom Weis-Vergleich.</li>
+      <li>Stöck (König und Ober der Trumpffarbe): ${RULE_SET.stoeckPoints} Punkte, unabhängig vom Weis-Vergleich. Angesagt wird es beim Ausspielen der zweiten der beiden Karten &ndash; oder schon beim Weisen, wenn beide in einem gemeldeten Weis stecken, etwa als Under-Ober-König im Trumpf.</li>
       <li>Letzter Stich: ${RULE_SET.lastTrickBonus} Punkte.</li>
       <li>Match (alle Stiche einer Runde): ${RULE_SET.matchBonus} Punkte.</li>
       <li>Eine Runde ergibt damit ${152 + RULE_SET.lastTrickBonus} Stichpunkte.</li>
     </ul>
 
-    <h3>Multiplikatoren im 2500er-Schieber</h3>
+    <h3>Spielart-Multiplikatoren</h3>
+    <p>Sie gelten in der 1000er- wie in der 2500er-Partie gleich. Der Zielscore bestimmt nur die Länge der Partie.</p>
     <table>
       <thead><tr><th>Spielart</th><th>Faktor</th></tr></thead>
       <tbody>${multipliers}</tbody>

@@ -175,19 +175,17 @@ test('Stoeck: Koenig und Ober der Trumpffarbe geben 20 Punkte', () => {
   assert.equal(hasStoeck([card('rosen', 'koenig'), card('rosen', 'ober')], 'obeAbe'), false, 'Kein Stoeck ohne Trumpf');
 });
 
-test('Stoeck wird dem Team des Besitzers gutgeschrieben', () => {
+test('Der Stoeck-Besitzer wird erkannt, aber noch nicht gutgeschrieben', () => {
   const game = createGame({ variantId: 'schieber' });
   startRound(game);
   const holder = game.players.findIndex((player) => hasStoeck(player.hand, 'rosen'));
   game.currentPlayer = game.forehandPlayer;
   chooseTrump(game, 'rosen');
 
-  if (holder < 0) {
-    assert.equal(game.stoeckPlayer, -1);
-    return;
-  }
-  assert.equal(game.stoeckPlayer, holder);
-  assert.equal(game.teamStoeckPoints[game.players[holder].teamId], RULE_SET.stoeckPoints);
+  assert.equal(game.stoeckPlayer, holder, 'Der Besitzer muss feststehen');
+  assert.equal(game.stoeckAnnounced, false, 'Angesagt wird erst waehrend des Spiels');
+  assert.equal(game.teamStoeckPoints[0], 0);
+  assert.equal(game.teamStoeckPoints[1], 0);
 });
 
 test('Match: alle Stiche einer Runde geben 100 Zusatzpunkte', () => {
@@ -204,14 +202,16 @@ test('Match: alle Stiche einer Runde geben 100 Zusatzpunkte', () => {
 
 /* ---------- M2.3 / M2.4: Punktetabellen ---------- */
 
-test('2500er-Multiplikatoren folgen der offiziellen Tabelle', () => {
-  assert.equal(getRoundMultiplier(2500, 'schellen'), 1);
-  assert.equal(getRoundMultiplier(2500, 'schilten'), 1);
-  assert.equal(getRoundMultiplier(2500, 'rosen'), 2);
-  assert.equal(getRoundMultiplier(2500, 'eicheln'), 2);
-  assert.equal(getRoundMultiplier(2500, 'obeAbe'), 3);
-  assert.equal(getRoundMultiplier(2500, 'uneUfe'), 4);
-  assert.equal(getRoundMultiplier(1000, 'uneUfe'), 1, 'Im 1000er zaehlt alles einfach');
+test('Spielart-Multiplikatoren gelten in beiden Partien gleich', () => {
+  const erwartet = {
+    rosen: 1, eicheln: 1, schellen: 2, schilten: 2, obeAbe: 3, uneUfe: 3, slalom: 3,
+  };
+
+  Object.entries(erwartet).forEach(([mode, faktor]) => {
+    assert.equal(getRoundMultiplier(mode), faktor, `${mode} direkt`);
+    assert.equal(getRoundMultiplier(1000, mode), faktor, `${mode} im 1000er`);
+    assert.equal(getRoundMultiplier(2500, mode), faktor, `${mode} im 2500er`);
+  });
 });
 
 test('Vier Sechser zaehlen nicht, vier Under und vier Neuner schon', () => {

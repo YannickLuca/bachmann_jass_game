@@ -45,11 +45,30 @@ Umgesetzt in `getLegalCards()`:
 - 36 Karten, 9 Karten pro Spieler, in 3er-Paketen verteilt
 - 2 feste Teams, Partner sitzt gegenüber
 - Geber und Vorhand rücken jede Runde gemeinsam weiter; die Rosen 7 bestimmt nur den ersten Geber
-- Vorhand wählt Trumpf, Obe-Abe oder Une-Ufe oder schiebt einmal an den Partner
+- Vorhand wählt Trumpf, Obe-Abe, Une-Ufe oder Slalom oder schiebt einmal an den Partner
 - Weis vor dem ersten Stich: nur das Team mit dem höchsten Weis schreibt seine Weise
 - Stöck (König + Ober der Trumpffarbe) gibt 20 Punkte, unabhängig vom Weis-Vergleich
 - Letzter Stich +5, alle neun Stiche (Match) +100
-- Ziel: 1000 oder 2500 Punkte
+- Ziel: 1000 oder 2500 Punkte. Der Zielscore bestimmt nur die Länge der Partie, die Multiplikatoren sind in beiden gleich
+
+### Spielarten
+
+| Spielart | Zählt | Beschreibung |
+| --- | --- | --- |
+| Rosen, Eicheln | x1 | Trumpffarbe, Under und Nell sind die höchsten Karten |
+| Schellen, Schilten | x2 | dito |
+| Obe-Abe | x3 | kein Trumpf, das Ass ist die höchste Karte |
+| Une-Ufe | x3 | kein Trumpf, die Sechs ist die höchste Karte |
+| Slalom | x3 | kein Trumpf, die Spielart wechselt mit jedem Stich |
+
+**Slalom** spielt den ersten Stich obenabe, den zweiten unten-ufe, den dritten wieder obenabe und so weiter. Rangfolge **und** Kartenwerte richten sich nach der Spielart des laufenden Stichs. Weil Asse nur in Obenabe-Stichen und Sechser nur in Une-Ufe-Stichen zählen, schwankt die Rundensumme; sie beträgt nicht wie sonst immer 157. Für den Weis-Vergleich gilt die Spielart des ersten Stichs.
+
+### Stöck
+
+Stöck wird nicht mehr vorab angesagt, sondern
+
+- beim Ausspielen der zweiten der beiden Karten (Trumpf-König und -Ober), oder
+- schon beim Weisen, wenn beide Karten in einem gemeldeten Weis stecken, zum Beispiel als Under-Ober-König im Trumpf.
 
 ### Bieterjass (Hausregel)
 
@@ -74,7 +93,7 @@ Regional abweichende Punkte stehen gesammelt in `RULE_SET` in `public/game-engin
 | Stöck | 20 | nur in Trumpfrunden |
 | Vier Sechser | zählen nicht | `fourSixesCount: false` |
 | Vier Gleiche vs. Folge bei gleicher Punktzahl | Vier Gleiche gewinnen | `fourOfAKindBeatsSequence: true` |
-| Multiplikatoren 2500er | Schellen/Schilten x1, Rosen/Eicheln x2, Obe-Abe x3, Une-Ufe x4 | |
+| Multiplikatoren | Rosen/Eicheln x1, Schellen/Schilten x2, Obe-Abe/Une-Ufe/Slalom x3 | gelten in beiden Partien |
 
 Abweichung von den offiziellen Regeln aus Gründen der Bedienbarkeit: Weis und Stöck werden in einer eigenen Phase **vor** dem ersten Stich gemeldet, nicht während des ersten Stichs.
 

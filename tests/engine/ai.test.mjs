@@ -101,15 +101,27 @@ test('Schwache Haende werden geschoben, starke nicht', () => {
   assert.equal(shouldPushTrump(strong, 1000), false, 'Starke Hand darf nicht geschoben werden');
 });
 
-test('Der 2500er-Multiplikator wirkt auf den Vorteil, nicht auf die Erwartung', () => {
-  const hand = [
+test('Der Multiplikator wirkt auf den Vorteil, nicht auf die Erwartung', () => {
+  const stark = [
     card('rosen', 'under'), card('rosen', '9'), card('rosen', 'ass'), card('rosen', 'koenig'),
-    card('eicheln', 'ass'), card('eicheln', 'koenig'), card('schellen', 'ass'),
-    card('schilten', '6'), card('schilten', '7'),
+    card('rosen', '10'), card('eicheln', 'ass'), card('eicheln', 'koenig'),
+    card('schellen', 'ass'), card('schilten', '6'),
+  ];
+  const schwach = [
+    card('rosen', '8'), card('rosen', '10'), card('eicheln', '9'), card('eicheln', 'ober'),
+    card('schellen', '8'), card('schellen', 'koenig'), card('schilten', '9'),
+    card('schilten', '10'), card('schilten', 'ober'),
   ];
 
-  assert.ok(modeAdvantage(hand, 'rosen', 2500) > modeAdvantage(hand, 'rosen', 1000));
-  assert.ok(modeAdvantage(hand, 'schellen', 2500) < modeAdvantage(hand, 'rosen', 2500));
+  // Gleiche Werte in beiden Partien: der Zielscore bestimmt nur die Laenge.
+  ['rosen', 'schellen', 'obeAbe', 'slalom'].forEach((mode) => {
+    assert.equal(modeAdvantage(stark, mode, 1000), modeAdvantage(stark, mode, 2500), mode);
+  });
+
+  // Ein Nachteil wird vom Multiplikator vervielfacht: dieselbe schwache Hand
+  // verliert im dreifach zaehlenden Obe-Abe mehr als im einfachen Rosen.
+  assert.ok(modeAdvantage(schwach, 'obeAbe', 1000) < modeAdvantage(schwach, 'rosen', 1000));
+  assert.ok(modeAdvantage(schwach, 'schellen', 1000) < modeAdvantage(schwach, 'eicheln', 1000));
 });
 
 /* ---------- Kartenspiel ---------- */

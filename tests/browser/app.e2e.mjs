@@ -194,6 +194,42 @@ try {
   );
   await page.click('#btn-close-scoreboard');
 
+  // --- Dialoge muessen ueber allem liegen (Statuszeile, Bedienleiste, Karten) ---
+  const deckt = async (dialogSelector) => page.evaluate(`
+    const dialog = document.querySelector(${JSON.stringify(dialogSelector)});
+    const box = dialog.querySelector('.trick-review-box');
+    const r = box.getBoundingClientRect();
+    const punkte = [
+      [r.left + r.width / 2, r.top + 12],
+      [r.left + r.width / 2, r.top + r.height / 2],
+      [r.left + 16, r.top + r.height / 2],
+    ];
+    const fremd = punkte
+      .map(([x, y]) => document.elementFromPoint(x, y))
+      .filter((el) => !el || !dialog.contains(el))
+      .map((el) => (el ? el.className || el.tagName : 'nichts'));
+    return fremd;
+  `);
+
+  await page.click('#btn-rules');
+  const rulesBlocked = await deckt('#rules-sheet');
+  check('Nichts liegt ueber dem Regel-Dialog', rulesBlocked.length === 0, rulesBlocked.join(', '));
+  await page.click('#btn-close-rules');
+
+  await page.click('#pile-0');
+  if (await page.visible('#trick-review')) {
+    const reviewBlocked = await deckt('#trick-review');
+    check('Nichts liegt ueber der Stich-Ansicht', reviewBlocked.length === 0, reviewBlocked.join(', '));
+    await page.click('#btn-close-review');
+  } else {
+    await page.click('#pile-1');
+    const reviewBlocked = await page.visible('#trick-review') ? await deckt('#trick-review') : [];
+    check('Nichts liegt ueber der Stich-Ansicht', reviewBlocked.length === 0, reviewBlocked.join(', '));
+    if (await page.visible('#trick-review')) {
+      await page.click('#btn-close-review');
+    }
+  }
+
   // --- Speicherstand (M4.1) ---
   const saved = await page.evaluate('return JSON.parse(localStorage.getItem("bachmann-jass:game:v1") || "null");');
   check('Spielstand liegt im localStorage', Boolean(saved?.game));
