@@ -1724,6 +1724,12 @@ body {
     padding: calc(0.42rem + env(safe-area-inset-top)) 0.55rem 0.35rem;
   }
 
+  /* Auf schmalen Geraeten passen drei Optionen nebeneinander, statt dass jede
+     eine eigene Zeile bekommt und das Formular unnoetig lang wird. */
+  .target-picker {
+    grid-template-columns: repeat(auto-fit, minmax(min(5.4rem, 100%), 1fr));
+  }
+
   .top-actions {
     /* Eigene Zeile erzwingen: sonst teilt sie sich die Zeile mit dem Titel,
        wird geschrumpft und die Knopfbeschriftungen brechen auf "Jas..." ab. */
