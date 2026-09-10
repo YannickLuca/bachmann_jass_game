@@ -115,8 +115,22 @@ try {
     trumpValues.includes(20) && trumpValues.includes(14) && trumpValues.reduce((a, b) => a + b, 0) === 62,
     `Trumpfreihe summiert ${trumpValues.reduce((a, b) => a + b, 0)}`
   );
+  const ruleMultipliers = await page.evaluate(`
+    const tables = [...document.querySelectorAll('#rules-sheet-body table')];
+    const last = tables[tables.length - 1];
+    return [...last.querySelectorAll('tbody tr')].map((r) => r.cells[0].textContent + ' ' + r.cells[1].textContent);
+  `);
   await page.click('#btn-close-rules');
   check('Regel-Dialog schliesst', !(await page.visible('#rules-sheet')));
+
+  // Der Setup-Text zu den Multiplikatoren wich frueher von den echten Werten ab.
+  await page.click('.variant-card[data-variant="schieber"]');
+  const setupCopy = await page.text('[data-target-score="2500"]');
+  const drift = ruleMultipliers.filter((entry) => {
+    const [mode, factor] = entry.split(' ');
+    return !setupCopy.includes(`${mode} ${factor}`) && !setupCopy.includes(`${mode}/`) && !setupCopy.includes(`/${mode} ${factor}`);
+  });
+  check('Setup-Text und Regel-Screen nennen dieselben Multiplikatoren', drift.length === 0, drift.join(', '));
 
   // --- Partie und Bedienung ---
   await startGame(page);

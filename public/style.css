@@ -13,7 +13,7 @@
   --border: rgba(255, 255, 255, 0.12);
   /* Auch die Fensterhoehe begrenzt die Karte: sonst werden auf breiten, aber
      niedrigen Fenstern Karten so gross, dass die Zonen kollidieren. */
-  --card-w: clamp(96px, min(11vw, 15dvh), 180px);
+  --card-w: clamp(88px, min(11vw, 13dvh), 180px);
   --card-h: calc(var(--card-w) * 1.444);
   --card-r: 14px;
   --hand-overlap: calc(var(--card-w) * -0.64);
@@ -236,7 +236,9 @@ body {
 .target-picker {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Passt sich der Anzahl an: zwei Punkteziele nebeneinander,
+     drei Stufen zu dritt statt als 2 + 1. */
+  grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
   gap: 0.65rem;
 }
 
@@ -459,13 +461,13 @@ body {
   grid-template-areas:
     ". top ."
     "left center right"
-    ". bottom .";
+    "bottom bottom bottom";
   grid-template-columns: minmax(150px, 1fr) minmax(520px, 2fr) minmax(150px, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0.75rem;
   padding: 0.8rem;
   overflow: visible;
-  align-items: center;
+  align-items: stretch;
   min-height: 0;
 }
 
@@ -574,6 +576,9 @@ body {
 }
 
 .player-label {
+  /* Sonst zeichnen die Kartenfaecher der Gegner ueber die Namensschilder. */
+  position: relative;
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: 0.45rem;
@@ -645,8 +650,9 @@ body {
 
 .hand-human {
   flex-wrap: nowrap;
-  justify-content: flex-start;
-  width: min(100%, 980px);
+  justify-content: center;
+  justify-content: safe center;
+  width: 100%;
   max-width: 100%;
   min-height: calc(var(--card-h) * var(--human-card-scale) + 42px);
   overflow-x: auto;
@@ -768,9 +774,16 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  /* Die Bedienleiste ist waehrend des Spiels leer. Mit space-between wuerde der
+     Stichtisch nach unten in die eigene Hand rutschen. */
+  justify-content: flex-start;
   gap: 0.65rem;
   min-width: 0;
+  min-height: 0;
+}
+
+.player-zone {
+  min-height: 0;
 }
 
 .status-row {
@@ -779,6 +792,10 @@ body {
   justify-content: center;
   gap: 0.7rem;
   flex-wrap: wrap;
+  /* Der Stichtisch ist hoeher als sein Container, seine Karten ragen darueber
+     hinaus. Die Statuszeile muss darum sichtbar obenauf bleiben. */
+  position: relative;
+  z-index: 55;
 }
 
 .trump-display {
@@ -859,6 +876,10 @@ body {
   align-items: center;
   justify-items: center;
   gap: 1rem;
+  /* Nimmt den freien Platz der Mittelspalte ein, damit der Stichtisch mittig
+     bleibt und nicht in die eigene Hand rutscht. */
+  flex: 1;
+  min-height: 0;
 }
 
 .table-area.mode-schieber .play-area {
@@ -1357,6 +1378,9 @@ body {
 }
 
 .log-line {
+  /* Ohne flex-shrink: 0 quetscht der Flex-Container die Zeilen zusammen,
+     statt den Verlauf scrollen zu lassen. */
+  flex: 0 0 auto;
   font-size: 0.76rem;
   color: rgba(255, 255, 255, 0.55);
   white-space: nowrap;
@@ -1447,6 +1471,20 @@ body {
 .scoreboard-table th:nth-child(2),
 .scoreboard-table td:nth-child(2) {
   text-align: left;
+}
+
+.scoreboard-group th {
+  padding-bottom: 0.1rem;
+  border-bottom: none;
+  text-align: center;
+  color: var(--text);
+  font-size: 0.82rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.scoreboard-group th:not(:first-child) {
+  border-bottom: 1px solid rgba(213, 169, 58, 0.28);
 }
 
 .scoreboard-table thead th {

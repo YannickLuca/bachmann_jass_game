@@ -510,6 +510,22 @@ function openFirstTrickReview(pileId) {
   trickReview.classList.remove('hidden');
 }
 
+/** Fasst die Spielart-Multiplikatoren aus dem RULE_SET als Text zusammen. */
+function describeMultipliers() {
+  const byFactor = new Map();
+  Object.entries(RULE_SET.roundMultipliers).forEach(([mode, factor]) => {
+    if (!byFactor.has(factor)) {
+      byFactor.set(factor, []);
+    }
+    byFactor.get(factor).push(getRoundModeLabel(mode));
+  });
+
+  return [...byFactor.entries()]
+    .sort((first, second) => first[0] - second[0])
+    .map(([factor, modes]) => `${modes.join('/')} x${factor}`)
+    .join(', ');
+}
+
 function renderSetupTargetOptions() {
   if (selectedVariantId !== 'schieber') {
     setupTargetSection.classList.add('hidden');
@@ -519,9 +535,11 @@ function renderSetupTargetOptions() {
   setupTargetSection.classList.remove('hidden');
   setupTargetOptions.innerHTML = SCHIEBER_TARGET_SCORES.map((score) => {
     const active = selectedSchieberTargetScore === score;
+    // Aus dem RULE_SET erzeugt, damit die Beschreibung nicht von den echten
+    // Multiplikatoren abweichen kann.
     const copy = score === 1000
       ? 'Alle Spielarten zählen einfach.'
-      : 'Rosen/Eicheln x1, Schilten/Schellen x2, Obe-Abe/Une-Ufe x3.';
+      : describeMultipliers();
 
     return `
       <button
@@ -743,6 +761,9 @@ function renderZones() {
 }
 
 function renderTrick() {
+  // Nach der letzten Karte gehoert die Buehne der Abrechnung, nicht mehr dem
+  // liegengebliebenen Stich.
+  const roundFinished = game.phase === 'roundEnd' || game.phase === 'gameOver';
   const capturedPile = game.phase === 'trickEnd'
     ? pileIdForWinner(game, game.trickLeader)
     : null;
@@ -764,7 +785,9 @@ function renderTrick() {
     }
 
     const playerIndex = Number(playerIndexString);
-    const entry = game.trick.find((current) => current.playerIndex === playerIndex);
+    const entry = roundFinished
+      ? undefined
+      : game.trick.find((current) => current.playerIndex === playerIndex);
     const trickIndex = game.trick.findIndex((current) => current.playerIndex === playerIndex);
     const animationKey = entry
       ? `${game.roundNumber}:${game.trickNumber}:${playerIndex}:${entry.card.id}`
@@ -1061,7 +1084,7 @@ function renderGameOver() {
   if (isBieter(game)) {
     const ranking = [...game.players].sort((first, second) => second.totalScore - first.totalScore);
     gameOverMsg.innerHTML = ranking
-      .map((player, index) => `${index + 1}. ${escapeHtml(player.name)} - ${player.totalScore} Punkte`)
+      .map((player, index) => `${index + 1}. ${escapeHtml(player.name)}: ${player.totalScore} Punkte`)
       .join('<br>');
     return;
   }
@@ -1070,7 +1093,7 @@ function renderGameOver() {
   gameOverMsg.innerHTML = `
     Ziel erreicht: ${getGameTargetScore(game)} Punkte<br><br>
     ${ranking
-      .map((team, index) => `${index + 1}. ${escapeHtml(team.name)} - ${team.totalScore} Punkte`)
+      .map((team, index) => `${index + 1}. ${escapeHtml(team.name)}: ${team.totalScore} Punkte`)
       .join('<br>')}
   `;
 }
@@ -1100,8 +1123,8 @@ function renderSchieberScoreboard(history) {
         <td>${entry.roundNumber}</td>
         <td>${escapeHtml(getRoundModeLabel(entry.roundMode))}${multiplier}${scoreboardTags(entry)}</td>
         <td>${own.roundPoints}</td>
-        <td>${enemy.roundPoints}</td>
         <td>${entry.totals[0]}</td>
+        <td>${enemy.roundPoints}</td>
         <td>${entry.totals[1]}</td>
       </tr>
     `;
@@ -1111,20 +1134,27 @@ function renderSchieberScoreboard(history) {
     <div class="scoreboard-scroll">
       <table class="scoreboard-table">
         <thead>
+          <tr class="scoreboard-group">
+            <th colspan="2"></th>
+            <th colspan="2">${escapeHtml(game.teams[0].name)}</th>
+            <th colspan="2">${escapeHtml(game.teams[1].name)}</th>
+          </tr>
           <tr>
             <th>Runde</th>
             <th>Spielart</th>
-            <th>${escapeHtml(game.teams[0].name)}</th>
-            <th>${escapeHtml(game.teams[1].name)}</th>
+            <th>Runde</th>
             <th>Total</th>
+            <th>Runde</th>
             <th>Total</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
           <tr>
-            <td colspan="4">Ziel ${getGameTargetScore(game)}</td>
+            <td colspan="2">Ziel ${getGameTargetScore(game)}</td>
+            <td></td>
             <td>${game.teams[0].totalScore}</td>
+            <td></td>
             <td>${game.teams[1].totalScore}</td>
           </tr>
         </tfoot>
