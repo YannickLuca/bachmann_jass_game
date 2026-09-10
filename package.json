@@ -7,9 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "deploy": "node scripts/build-gh-pages.mjs",
+    "build": "node scripts/build-site.mjs",
     "test": "node --test tests/engine/*.test.mjs",
-    "check:docs": "node scripts/build-gh-pages.mjs --check",
     "test:e2e": "node tests/browser/app.e2e.mjs"
   },
   "dependencies": {

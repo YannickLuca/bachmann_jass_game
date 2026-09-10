@@ -24,7 +24,5 @@ jobs:
       - name: Regelengine testen
         run: npm test
 
-      # Verhindert, dass die auf GitHub Pages ausgelieferte Version
-      # hinter public/ zurueckfaellt.
-      - name: docs/ auf Aktualitaet pruefen
-        run: npm run check:docs
+      - name: Statische App bauen
+        run: npm run build

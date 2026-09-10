@@ -111,19 +111,21 @@ test('Der Service Worker cacht nur Dateien, die es wirklich gibt', () => {
   });
 });
 
-test('Der Build setzt fuer docs/ eine eigene Cache-Version', () => {
-  const buildScript = read('scripts/build-gh-pages.mjs');
+test('Der Build setzt eine eigene Cache-Version', () => {
+  const buildScript = read('scripts/build-site.mjs');
   assert.ok(buildScript.includes('CACHE_NAME'), 'Der Build muss den Cachenamen setzen');
+  assert.ok(buildScript.includes(String.raw`split('\r\n')`), 'Der Hash muss Zeilenenden normalisieren');
 
-  const docsServiceWorker = path.join(root, 'docs/service-worker.js');
-  if (!fs.existsSync(docsServiceWorker)) {
+  const built = path.join(root, 'dist/service-worker.js');
+  if (!fs.existsSync(built)) {
     return;
   }
-  const deployed = fs.readFileSync(docsServiceWorker, 'utf8').match(/const CACHE_NAME = '([^']+)'/);
-  assert.ok(deployed, 'docs/service-worker.js hat keinen Cachenamen');
+
+  const deployed = fs.readFileSync(built, 'utf8').match(/const CACHE_NAME = '([^']+)'/);
+  assert.ok(deployed, 'dist/service-worker.js hat keinen Cachenamen');
   assert.notEqual(
     deployed[1],
     serviceWorker.match(/const CACHE_NAME = '([^']+)'/)[1],
-    'docs/ muss eine gebaute Cache-Version tragen, nicht die Entwicklungsversion'
+    'Der Build muss eine gehashte Cache-Version tragen, nicht die Entwicklungsversion'
   );
 });
