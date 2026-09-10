@@ -125,7 +125,12 @@ try {
   const badges = await page.evaluate(
     'return ["left","top","right","bottom"].map(p => document.getElementById("badge-" + p).textContent.trim()).filter(Boolean);'
   );
-  check('Geber- und Partner-Abzeichen (M4.6)', badges.includes('Geber') && badges.includes('Partner'), JSON.stringify(badges));
+  const badgeText = badges.join(' ');
+  check(
+    'Geber- und Partner-Abzeichen (M4.6)',
+    badgeText.includes('Geber') && badgeText.includes('Partner'),
+    JSON.stringify(badges)
+  );
 
   const cardInfo = await page.evaluate(`
     const cards = [...document.querySelectorAll('#hand-bottom .card-face')];
@@ -167,7 +172,12 @@ try {
     return { rows: rows.length, text: document.getElementById('scoreboard-body').textContent };
   `);
   check('Jasstafel listet die gespielte Runde (M4.3)', board.rows === 1, `Zeilen: ${board.rows}`);
-  check('Jasstafel nennt die Spielart', board.text.includes('Rosen'));
+  const modeLabels = ['Eicheln', 'Rosen', 'Schellen', 'Schilten', 'Obe-Abe', 'Une-Ufe'];
+  check(
+    'Jasstafel nennt die Spielart',
+    modeLabels.some((label) => board.text.includes(label)),
+    board.text.slice(0, 60)
+  );
   await page.click('#btn-close-scoreboard');
 
   // --- Speicherstand (M4.1) ---

@@ -308,13 +308,15 @@ function getPlayerBadge(playerIndex) {
     return player.bid === 0 ? 'Pass' : String(player.bid);
   }
 
-  if (playerIndex === game.dealer) {
-    return 'Geber';
-  }
+  // Der Partner kann zugleich Geber sein - dann muss beides sichtbar bleiben.
+  const marks = [];
   if (playerIndex === partnerOf(game, 0)) {
-    return 'Partner';
+    marks.push('Partner');
   }
-  return '';
+  if (playerIndex === game.dealer) {
+    marks.push('Geber');
+  }
+  return marks.join(' · ');
 }
 
 function cardBackEl() {

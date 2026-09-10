@@ -151,7 +151,9 @@ Für GitHub Pages wird die statische Web-App aus `docs/` veröffentlicht.
 - `docs/index.html` ist der Einstiegspunkt
 - `docs/.nojekyll` verhindert, dass GitHub Pages die App als Jekyll-Seite behandelt
 - `docs/manifest.webmanifest` und `docs/service-worker.js` machen die App installierbar
-- in GitHub unter `Settings -> Pages` sollte `Deploy from a branch` mit dem Ordner `/docs` gewählt werden
+- in GitHub steht unter `Settings -> Pages` aktuell `Deploy from a branch` mit **Root** statt `/docs`
+
+Die App liegt deshalb unter `https://yannickluca.github.io/bachmann_jass_game/docs/`, nicht direkt unter der Repo-URL. Sie funktioniert so vollständig. Stellt man Pages auf `/docs` um, wandert die App auf die kürzere Adresse ohne `/docs` - dann muss aber jedes bereits gespeicherte Home-Bildschirm-Symbol neu angelegt werden.
 
 Nach jeder Änderung an `public/`:
 
