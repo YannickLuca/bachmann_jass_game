@@ -943,8 +943,9 @@ function renderMessage() {
   msgEl.className = 'message';
 
   if (game.phase === 'bidding') {
+    // Die Bedienleiste sagt bereits "Dein Gebot:", hier braucht es etwas anderes.
     msgEl.textContent = game.players[game.currentPlayer].isHuman
-      ? 'Dein Gebot:'
+      ? 'Schätze deine Karten und biete.'
       : `${game.players[game.currentPlayer].name} bietet...`;
     return;
   }
